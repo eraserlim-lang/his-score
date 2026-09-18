@@ -12,6 +12,7 @@ import '../../../core/db/tag_dao.dart';
 import '../../../core/storage/app_paths.dart';
 import '../../importer/data/score_importer.dart';
 import 'cover_image.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 악보 정보 화면. 제목, 아티스트, 작곡가, 태그, 표지를 고친다.
 Future<void> showScoreInfoSheet(BuildContext context, String scoreId) {
@@ -71,7 +72,7 @@ class _ScoreInfoBodyState extends ConsumerState<_ScoreInfoBody> {
     final title = _title.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('제목은 비울 수 없습니다')));
+          .showSnackBar(SnackBar(content: Text(tr('제목은 비울 수 없습니다'))));
       return;
     }
     await ref.read(scoreDaoProvider).updateScore(
@@ -105,12 +106,12 @@ class _ScoreInfoBodyState extends ConsumerState<_ScoreInfoBody> {
           children: [
             ListTile(
               leading: const Icon(Icons.auto_stories_outlined),
-              title: const Text('악보 페이지에서 고르기'),
+              title: Text(tr('악보 페이지에서 고르기')),
               onTap: () => Navigator.pop(context, _CoverChoice.page),
             ),
             ListTile(
               leading: const Icon(Icons.photo_outlined),
-              title: const Text('사진에서 고르기'),
+              title: Text(tr('사진에서 고르기')),
               onTap: () => Navigator.pop(context, _CoverChoice.photo),
             ),
           ],
@@ -156,7 +157,7 @@ class _ScoreInfoBodyState extends ConsumerState<_ScoreInfoBody> {
     return showDialog<int>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('표지로 쓸 페이지'),
+        title: Text(tr('표지로 쓸 페이지')),
         children: [
           SizedBox(
             width: 300,
@@ -225,13 +226,13 @@ class _ScoreInfoBodyState extends ConsumerState<_ScoreInfoBody> {
                 children: [
                   TextField(
                     controller: _title,
-                    decoration: const InputDecoration(labelText: '제목'),
+                    decoration: InputDecoration(labelText: tr('제목')),
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: _artist,
-                    decoration: const InputDecoration(labelText: '아티스트'),
+                    decoration: InputDecoration(labelText: tr('아티스트')),
                     textInputAction: TextInputAction.next,
                   ),
                 ],
@@ -245,20 +246,20 @@ class _ScoreInfoBodyState extends ConsumerState<_ScoreInfoBody> {
             Expanded(
               child: TextField(
                 controller: _composer,
-                decoration: const InputDecoration(labelText: '작곡가'),
+                decoration: InputDecoration(labelText: tr('작곡가')),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: _genre,
-                decoration: const InputDecoration(labelText: '장르'),
+                decoration: InputDecoration(labelText: tr('장르')),
               ),
             ),
           ],
         ),
         const SizedBox(height: 20),
-        Text('태그', style: Theme.of(context).textTheme.labelLarge),
+        Text(tr('태그'), style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 8),
         Wrap(
           spacing: 6,
@@ -286,9 +287,9 @@ class _ScoreInfoBodyState extends ConsumerState<_ScoreInfoBody> {
           fieldViewBuilder: (context, controller, focus, onSubmit) => TextField(
             controller: controller,
             focusNode: focus,
-            decoration: const InputDecoration(
-              labelText: '태그 추가',
-              hintText: '입력 후 Enter',
+            decoration: InputDecoration(
+              labelText: tr('태그 추가'),
+              hintText: tr('입력 후 Enter'),
               prefixIcon: Icon(Icons.tag),
             ),
             onSubmitted: (v) async {
@@ -299,7 +300,7 @@ class _ScoreInfoBodyState extends ConsumerState<_ScoreInfoBody> {
         ),
         const SizedBox(height: 20),
         Text(
-          '${score.pageCount}쪽 · ${_formatSize(score.fileSize)}',
+          tr('{0}쪽 · {1}', [score.pageCount, _formatSize(score.fileSize)]),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 16),
@@ -308,10 +309,10 @@ class _ScoreInfoBodyState extends ConsumerState<_ScoreInfoBody> {
           children: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소'),
+              child: Text(tr('취소')),
             ),
             const SizedBox(width: 8),
-            FilledButton(onPressed: _save, child: const Text('저장')),
+            FilledButton(onPressed: _save, child: Text(tr('저장'))),
           ],
         ),
       ],

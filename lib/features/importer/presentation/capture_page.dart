@@ -8,6 +8,7 @@ import '../../../core/layout/breakpoints.dart';
 import '../../viewer/presentation/pages/page_order_page.dart' show ReorderableGridView;
 import '../data/image_to_pdf.dart';
 import '../data/score_importer.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 종이 악보 촬영.
 ///
@@ -60,18 +61,18 @@ class _CapturePageState extends ConsumerState<CapturePage> {
       final importer = await ref.read(scoreImporterProvider.future);
       final id = await importer.importFile(
         pdf,
-        title: _title.text.trim().isEmpty ? '촬영 ${_dateLabel()}' : _title.text.trim(),
+        title: _title.text.trim().isEmpty ? tr('촬영 {0}', [_dateLabel()]) : _title.text.trim(),
         deleteSource: true,
       );
       if (!mounted) return;
       if (id == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('저장하지 못했습니다')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('저장하지 못했습니다'))));
         return;
       }
       Navigator.pop(context, id);
     } on Object catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF 를 만들지 못했습니다: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('PDF 를 만들지 못했습니다: {0}', [e]))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -87,13 +88,13 @@ class _CapturePageState extends ConsumerState<CapturePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('종이 악보 촬영'),
+        title: Text(tr('종이 악보 촬영')),
         actions: [
           FilledButton(
             onPressed: _pages.isEmpty || _busy ? null : _save,
             child: _busy
                 ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : Text('저장 (${_pages.length}장)'),
+                : Text(tr('저장 ({0}장)', [_pages.length])),
           ),
           const SizedBox(width: 12),
         ],
@@ -104,12 +105,12 @@ class _CapturePageState extends ConsumerState<CapturePage> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: TextField(
               controller: _title,
-              decoration: const InputDecoration(labelText: '제목', hintText: '비우면 날짜로 저장'),
+              decoration: InputDecoration(labelText: tr('제목'), hintText: tr('비우면 날짜로 저장')),
             ),
           ),
           SwitchListTile(
-            title: const Text('흑백 보정'),
-            subtitle: const Text('누런 배경과 그림자를 지워 오선을 또렷하게'),
+            title: Text(tr('흑백 보정')),
+            subtitle: Text(tr('누런 배경과 그림자를 지워 오선을 또렷하게')),
             value: _enhance,
             onChanged: (v) => setState(() => _enhance = v),
           ),
@@ -121,7 +122,7 @@ class _CapturePageState extends ConsumerState<CapturePage> {
                       children: [
                         Icon(Icons.photo_camera_outlined, size: 48, color: Theme.of(context).colorScheme.outline),
                         const SizedBox(height: 12),
-                        const Text('아래 버튼으로 페이지를 담으세요'),
+                        Text(tr('아래 버튼으로 페이지를 담으세요')),
                       ],
                     ),
                   )
@@ -151,7 +152,7 @@ class _CapturePageState extends ConsumerState<CapturePage> {
                       child: FilledButton.tonalIcon(
                         onPressed: _busy ? null : _takePhoto,
                         icon: const Icon(Icons.photo_camera),
-                        label: const Text('촬영'),
+                        label: Text(tr('촬영')),
                       ),
                     ),
                   if (_hasCamera) const SizedBox(width: 8),
@@ -159,7 +160,7 @@ class _CapturePageState extends ConsumerState<CapturePage> {
                     child: FilledButton.tonalIcon(
                       onPressed: _busy ? null : _pickFromAlbum,
                       icon: const Icon(Icons.photo_library_outlined),
-                      label: const Text('앨범에서 고르기'),
+                      label: Text(tr('앨범에서 고르기')),
                     ),
                   ),
                 ],
@@ -214,8 +215,8 @@ class _CaptureTile extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              IconButton(iconSize: 18, onPressed: onRotate, icon: const Icon(Icons.rotate_right), tooltip: '돌리기'),
-              IconButton(iconSize: 18, onPressed: onRemove, icon: const Icon(Icons.close), tooltip: '빼기'),
+              IconButton(iconSize: 18, onPressed: onRotate, icon: const Icon(Icons.rotate_right), tooltip: tr('돌리기')),
+              IconButton(iconSize: 18, onPressed: onRemove, icon: const Icon(Icons.close), tooltip: tr('빼기')),
             ],
           ),
         ],

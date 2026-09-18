@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../viewer/domain/viewer_controller.dart';
 import '../data/sync_protocol.dart';
 import '../data/sync_service.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 기기 동기화 설정 시트. 역할을 고르고 상대 기기를 본다.
 Future<void> showSyncSheet(BuildContext context) {
@@ -26,7 +27,7 @@ class SyncPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final serviceAsync = ref.watch(syncServiceProvider);
     final service = serviceAsync.value;
-    if (service == null) return const Center(child: CircularProgressIndicator());
+    if (service == null) return Center(child: CircularProgressIndicator());
 
     return ListenableBuilder(
       listenable: service,
@@ -34,20 +35,19 @@ class SyncPanel extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('기기 동기화', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 4),
+          Text(tr('기기 동기화'), style: Theme.of(context).textTheme.titleLarge),
+          SizedBox(height: 4),
           Text(
-            '같은 와이파이에 있는 기기끼리 페이지 넘김과 곡 선택을 맞춥니다. '
-            '리드가 넘기면 팔로워가 따라가고, 팔로워에 없는 곡은 리드가 보내 줍니다.',
+            tr('같은 와이파이에 있는 기기끼리 페이지 넘김과 곡 선택을 맞춥니다. 리드가 넘기면 팔로워가 따라가고, 팔로워에 없는 곡은 리드가 보내 줍니다.'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           SegmentedButton<SyncRole>(
-            segments: const [
-              ButtonSegment(value: SyncRole.off, label: Text('끄기')),
-              ButtonSegment(value: SyncRole.lead, label: Text('리드'), icon: Icon(Icons.wifi_tethering)),
-              ButtonSegment(value: SyncRole.follow, label: Text('팔로우'), icon: Icon(Icons.wifi)),
-              ButtonSegment(value: SyncRole.remote, label: Text('리모컨'), icon: Icon(Icons.settings_remote)),
+            segments: [
+              ButtonSegment(value: SyncRole.off, label: Text(tr('끄기'))),
+              ButtonSegment(value: SyncRole.lead, label: Text(tr('리드')), icon: Icon(Icons.wifi_tethering)),
+              ButtonSegment(value: SyncRole.follow, label: Text(tr('팔로우')), icon: Icon(Icons.wifi)),
+              ButtonSegment(value: SyncRole.remote, label: Text(tr('리모컨')), icon: Icon(Icons.settings_remote)),
             ],
             selected: {service.role},
             onSelectionChanged: (s) => service.setRole(s.first),
@@ -57,7 +57,7 @@ class SyncPanel extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.devices),
             title: Text(service.deviceName),
-            subtitle: Text(service.status ?? '꺼짐'),
+            subtitle: Text(service.status ?? tr('꺼짐')),
             trailing: IconButton(
               icon: const Icon(Icons.edit_outlined),
               onPressed: () async {
@@ -65,10 +65,10 @@ class SyncPanel extends ConsumerWidget {
                 final v = await showDialog<String>(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('이 기기 이름'),
+                    title: Text(tr('이 기기 이름')),
                     content: TextField(controller: c, autofocus: true),
                     actions: [
-                      FilledButton(onPressed: () => Navigator.pop(context, c.text), child: const Text('저장')),
+                      FilledButton(onPressed: () => Navigator.pop(context, c.text), child: Text(tr('저장'))),
                     ],
                   ),
                 );
@@ -77,14 +77,14 @@ class SyncPanel extends ConsumerWidget {
             ),
           ),
           if (service.role == SyncRole.lead && service.leadPort != null)
-            Text('포트 ${service.leadPort} · 연결 ${service.clientCount}대', style: Theme.of(context).textTheme.bodySmall),
+            Text(tr('포트 {0} · 연결 {1}대', [service.leadPort, service.clientCount]), style: Theme.of(context).textTheme.bodySmall),
           if (service.role == SyncRole.follow || service.role == SyncRole.remote) ...[
             const SizedBox(height: 8),
-            Text('발견된 리드', style: Theme.of(context).textTheme.labelLarge),
+            Text(tr('발견된 리드'), style: Theme.of(context).textTheme.labelLarge),
             if (service.peers.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text('아직 없습니다. 리드 기기에서 "리드" 를 켜 주세요.'),
+                child: Text(tr('아직 없습니다. 리드 기기에서 "리드" 를 켜 주세요.')),
               ),
             for (final peer in service.peers)
               ListTile(
@@ -97,7 +97,7 @@ class SyncPanel extends ConsumerWidget {
             TextButton.icon(
               onPressed: () => _connectManually(context, service),
               icon: const Icon(Icons.add_link),
-              label: const Text('주소로 직접 연결'),
+              label: Text(tr('주소로 직접 연결')),
             ),
           ],
           if (service.role == SyncRole.remote) ...[
@@ -115,17 +115,17 @@ class SyncPanel extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('리드 기기 주소'),
+        title: Text(tr('리드 기기 주소')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: host, decoration: const InputDecoration(labelText: 'IP 주소', hintText: '192.168.0.10')),
-            TextField(controller: port, decoration: const InputDecoration(labelText: '포트'), keyboardType: TextInputType.number),
+            TextField(controller: host, decoration: InputDecoration(labelText: tr('IP 주소'), hintText: '192.168.0.10')),
+            TextField(controller: port, decoration: InputDecoration(labelText: tr('포트')), keyboardType: TextInputType.number),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('연결')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('취소'))),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(tr('연결'))),
         ],
       ),
     );
@@ -178,7 +178,7 @@ class RemotePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final service = ref.watch(syncServiceProvider).value;
     return Scaffold(
-      appBar: AppBar(title: const Text('리모컨')),
+      appBar: AppBar(title: Text(tr('리모컨'))),
       body: service == null
           ? const Center(child: CircularProgressIndicator())
           : ListenableBuilder(
@@ -191,13 +191,13 @@ class RemotePage extends ConsumerWidget {
                       FilledButton.icon(
                         onPressed: () => service.setRole(SyncRole.remote),
                         icon: const Icon(Icons.settings_remote),
-                        label: const Text('리모컨 모드 켜기'),
+                        label: Text(tr('리모컨 모드 켜기')),
                       ),
                     Text(service.status ?? '', style: Theme.of(context).textTheme.bodySmall),
                     const Spacer(),
                     const RemoteControls(),
                     const Spacer(),
-                    TextButton(onPressed: () => showSyncSheet(context), child: const Text('연결 설정')),
+                    TextButton(onPressed: () => showSyncSheet(context), child: Text(tr('연결 설정'))),
                   ],
                 ),
               ),

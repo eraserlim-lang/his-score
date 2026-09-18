@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:pdfrx/pdfrx.dart';
 
 import '../../../core/storage/app_paths.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 카탈로그에 보여줄 표지 이미지를 만든다.
 ///
@@ -33,13 +34,13 @@ class CoverGenerator {
       fullHeight: height,
       backgroundColor: 0xFFFFFFFF,
     );
-    if (rendered == null) throw StateError('표지를 구울 수 없습니다');
+    if (rendered == null) throw StateError(tr('표지를 구울 수 없습니다'));
 
     try {
       final image = await _decode(rendered);
       final png = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
-      if (png == null) throw StateError('PNG 변환 실패');
+      if (png == null) throw StateError(tr('PNG 변환 실패'));
 
       return _write(scoreId, png.buffer.asUint8List());
     } finally {
@@ -58,7 +59,7 @@ class CoverGenerator {
     final png = await frame.image.toByteData(format: ui.ImageByteFormat.png);
     frame.image.dispose();
     codec.dispose();
-    if (png == null) throw StateError('이미지를 읽을 수 없습니다');
+    if (png == null) throw StateError(tr('이미지를 읽을 수 없습니다'));
 
     return _write(scoreId, png.buffer.asUint8List());
   }

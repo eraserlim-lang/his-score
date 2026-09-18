@@ -6,6 +6,7 @@ import '../../../../core/db/database.dart';
 import '../../../../core/db/score_dao.dart';
 import '../../data/score_session.dart';
 import '../widgets/score_page_view.dart';
+import '../../../../core/i18n/tr.dart';
 
 /// 여백 잘라내기와 기울기 보정.
 ///
@@ -129,12 +130,12 @@ class _CropBodyState extends ConsumerState<_CropBody> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
-              Text('페이지 조정', style: Theme.of(context).textTheme.titleLarge),
-              const Spacer(),
+              Text(tr('페이지 조정'), style: Theme.of(context).textTheme.titleLarge),
+              Spacer(),
               SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: true, label: Text('모든 페이지')),
-                  ButtonSegment(value: false, label: Text('이 페이지')),
+                segments: [
+                  ButtonSegment(value: true, label: Text(tr('모든 페이지'))),
+                  ButtonSegment(value: false, label: Text(tr('이 페이지'))),
                 ],
                 selected: {_allPages},
                 onSelectionChanged: (s) => setState(() {
@@ -158,14 +159,14 @@ class _CropBodyState extends ConsumerState<_CropBody> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
           child: Column(
             children: [
-              _edge('왼쪽', _left, (v) => setState(() => _left = v)),
-              _edge('오른쪽', _right, (v) => setState(() => _right = v)),
-              _edge('위', _top, (v) => setState(() => _top = v)),
-              _edge('아래', _bottom, (v) => setState(() => _bottom = v)),
+              _edge(tr('왼쪽'), _left, (v) => setState(() => _left = v)),
+              _edge(tr('오른쪽'), _right, (v) => setState(() => _right = v)),
+              _edge(tr('위'), _top, (v) => setState(() => _top = v)),
+              _edge(tr('아래'), _bottom, (v) => setState(() => _bottom = v)),
               if (!_allPages)
                 Row(
                   children: [
-                    const SizedBox(width: 56, child: Text('기울기')),
+                    SizedBox(width: 56, child: Text(tr('기울기'))),
                     Expanded(
                       child: Slider(
                         value: _rotation,
@@ -179,7 +180,7 @@ class _CropBodyState extends ConsumerState<_CropBody> {
                     IconButton(
                       onPressed: () => setState(() => _rotation = (_rotation + 90) % 360),
                       icon: const Icon(Icons.rotate_right),
-                      tooltip: '90° 돌리기',
+                      tooltip: tr('90° 돌리기'),
                     ),
                   ],
                 ),
@@ -187,21 +188,21 @@ class _CropBodyState extends ConsumerState<_CropBody> {
               Row(
                 children: [
                   if (!_allPages)
-                    TextButton(onPressed: _resetPage, child: const Text('이 페이지 초기화'))
+                    TextButton(onPressed: _resetPage, child: Text(tr('이 페이지 초기화')))
                   else
                     TextButton(
                       onPressed: () => setState(() {
                         _left = _top = _right = _bottom = 0;
                       }),
-                      child: const Text('초기화'),
+                      child: Text(tr('초기화')),
                     ),
                   const Spacer(),
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: const Text('취소'),
+                    child: Text(tr('취소')),
                   ),
                   const SizedBox(width: 8),
-                  FilledButton(onPressed: _save, child: const Text('저장')),
+                  FilledButton(onPressed: _save, child: Text(tr('저장'))),
                 ],
               ),
             ],

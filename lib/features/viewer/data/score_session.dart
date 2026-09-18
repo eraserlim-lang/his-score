@@ -9,6 +9,7 @@ import '../../../core/db/score_dao.dart';
 import '../../../core/db/setlist_dao.dart';
 import '../../../core/storage/app_paths.dart';
 import 'page_render_cache.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 뷰어가 열 대상. 곡 하나이거나 세트리스트 하나다.
 @immutable
@@ -176,7 +177,7 @@ class ScoreSession {
       );
     }
 
-    if (scores.isEmpty) throw StateError('세트리스트가 비어 있습니다');
+    if (scores.isEmpty) throw StateError(tr('세트리스트가 비어 있습니다'));
 
     return ScoreSession._(
       key: SessionKey.setlist(setlist.id),
@@ -281,7 +282,7 @@ final scoreSessionProvider =
   if (key.isSetlist) {
     final setlistDao = ref.watch(setlistDaoProvider);
     final setlist = await setlistDao.findById(key.id);
-    if (setlist == null) throw StateError('세트리스트를 찾을 수 없습니다');
+    if (setlist == null) throw StateError(tr('세트리스트를 찾을 수 없습니다'));
     session = await ScoreSession.openSetlist(
       setlist: setlist,
       entries: await setlistDao.entries(key.id),
@@ -290,7 +291,7 @@ final scoreSessionProvider =
     );
   } else {
     final score = await dao.findById(key.id);
-    if (score == null) throw StateError('악보를 찾을 수 없습니다');
+    if (score == null) throw StateError(tr('악보를 찾을 수 없습니다'));
     session = await ScoreSession.openScore(
       score: score,
       scorePages: await dao.visiblePages(key.id),

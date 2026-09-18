@@ -10,6 +10,7 @@ import '../../../../core/db/score_dao.dart';
 import '../../../../core/layout/breakpoints.dart';
 import '../../data/page_render_cache.dart';
 import '../../data/score_session.dart';
+import '../../../../core/i18n/tr.dart';
 
 /// 페이지 순서 편집. 숨기기, 드래그 이동, 복제, 빈 페이지 추가.
 ///
@@ -99,10 +100,10 @@ class _PageOrderPageState extends ConsumerState<PageOrderPage> {
         final leave = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('저장하지 않고 나갈까요?'),
+            title: Text(tr('저장하지 않고 나갈까요?')),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('계속 편집')),
-              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('나가기')),
+              TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('계속 편집'))),
+              FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(tr('나가기'))),
             ],
           ),
         );
@@ -110,17 +111,17 @@ class _PageOrderPageState extends ConsumerState<PageOrderPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('페이지 순서'),
+          title: Text(tr('페이지 순서')),
           actions: [
             TextButton.icon(
               onPressed: () => _mutate((e) => e.add(
                     _Entry(id: _uuid.v4(), sourceIndex: -1, hidden: false),
                   )),
               icon: const Icon(Icons.note_add_outlined),
-              label: const Text('빈 페이지'),
+              label: Text(tr('빈 페이지')),
             ),
             const SizedBox(width: 8),
-            FilledButton(onPressed: _dirty ? _save : null, child: const Text('저장')),
+            FilledButton(onPressed: _dirty ? _save : null, child: Text(tr('저장'))),
             const SizedBox(width: 12),
           ],
         ),
@@ -131,7 +132,7 @@ class _PageOrderPageState extends ConsumerState<PageOrderPage> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: Text(
-                      '길게 눌러 끌면 순서가 바뀝니다. 눈 아이콘으로 숨기고, + 로 복제합니다.',
+                      tr('길게 눌러 끌면 순서가 바뀝니다. 눈 아이콘으로 숨기고, + 로 복제합니다.'),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
@@ -200,9 +201,9 @@ class _PageTile extends StatelessWidget {
                 Opacity(
                   opacity: entry.hidden ? 0.3 : 1,
                   child: entry.isBlank
-                      ? const ColoredBox(
+                      ? ColoredBox(
                           color: Colors.white,
-                          child: Center(child: Text('빈 페이지', style: TextStyle(color: Colors.black38))),
+                          child: Center(child: Text(tr('빈 페이지'), style: TextStyle(color: Colors.black38))),
                         )
                       : _Thumb(cache: cache, pageNumber: entry.sourceIndex + 1),
                 ),
@@ -227,20 +228,20 @@ class _PageTile extends StatelessWidget {
                 iconSize: 18,
                 onPressed: onToggleHidden,
                 icon: Icon(entry.hidden ? Icons.visibility : Icons.visibility_off_outlined),
-                tooltip: entry.hidden ? '보이기' : '숨기기',
+                tooltip: entry.hidden ? tr('보이기') : tr('숨기기'),
               ),
               IconButton(
                 iconSize: 18,
                 onPressed: onDuplicate,
                 icon: const Icon(Icons.add_box_outlined),
-                tooltip: '복제',
+                tooltip: tr('복제'),
               ),
               if (onRemove != null)
                 IconButton(
                   iconSize: 18,
                   onPressed: onRemove,
                   icon: const Icon(Icons.close),
-                  tooltip: '빼기',
+                  tooltip: tr('빼기'),
                 ),
             ],
           ),

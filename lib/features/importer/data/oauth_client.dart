@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/i18n/tr.dart';
 
 /// OAuth 2.0 PKCE 로그인.
 ///
@@ -128,7 +129,7 @@ class OAuthClient {
           ..headers.contentType = ContentType.html
           ..write(
             '<html><body style="font-family:sans-serif;text-align:center;padding:40px">'
-            '<h2>HIScore</h2><p>로그인이 끝났습니다. 이 창을 닫고 앱으로 돌아가세요.</p></body></html>',
+            '<h2>HIScore</h2><p>${tr('로그인이 끝났습니다. 이 창을 닫고 앱으로 돌아가세요.')}</p></body></html>',
           );
         await req.response.close();
         if (!codeCompleter.isCompleted) {

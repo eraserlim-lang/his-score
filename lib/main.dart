@@ -3,6 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfrx/pdfrx.dart';
 
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+import 'core/db/settings_dao.dart';
+import 'core/i18n/tr.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/importer/data/open_in_handler.dart';
@@ -14,6 +18,7 @@ Future<void> main() async {
 
   // pdfium 을 올린다. 이걸 빼면 첫 악보를 여는 순간 죽는다.
   await pdfrxFlutterInitialize();
+  await AppLocale.load();
 
   await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
   runApp(const ProviderScope(child: HIScoreApp()));
@@ -29,13 +34,34 @@ class HIScoreApp extends ConsumerWidget {
     if (WatchFolderService.supported) ref.watch(watchFolderServiceProvider);
     ref.watch(syncServiceProvider);
 
-    return MaterialApp.router(
-      title: 'HIScore',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
-      routerConfig: ref.watch(appRouterProvider),
+    // 저장된 언어와 테마를 첫 프레임 전에 반영한다.
+    final settings = ref.watch(settingsDaoProvider);
+    final savedLocale = ref.watch(settingProvider(SettingKeys.locale)).value;
+    AppLocale.override.value = savedLocale == null ? null : Locale(savedLocale);
+    final savedTheme = ref.watch(settingProvider(SettingKeys.themeMode)).value;
+    final themeMode = ThemeMode.values.firstWhere(
+      (m) => m.name == savedTheme,
+      orElse: () => ThemeMode.system,
+    );
+    settings.hashCode;
+
+    return ValueListenableBuilder<Locale?>(
+      valueListenable: AppLocale.override,
+      builder: (context, _, _) => MaterialApp.router(
+        title: 'HIScore',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: themeMode,
+        locale: AppLocale.current,
+        supportedLocales: AppLocale.supported,
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        routerConfig: ref.watch(appRouterProvider),
+      ),
     );
   }
 }

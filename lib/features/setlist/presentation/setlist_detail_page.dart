@@ -7,6 +7,7 @@ import '../../../core/db/setlist_dao.dart';
 import '../../library/presentation/cover_image.dart';
 import '../../library/presentation/tag_manager_sheet.dart';
 import 'setlist_share_actions.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 세트리스트 하나. 순서 바꾸기, 곡 추가/제거, 구간 지정.
 class SetlistDetailPage extends ConsumerWidget {
@@ -35,17 +36,17 @@ class SetlistDetailPage extends ConsumerWidget {
           IconButton(
             onPressed: () => _rename(context, ref, setlist.name, setlist.note),
             icon: const Icon(Icons.edit_outlined),
-            tooltip: '이름과 메모',
+            tooltip: tr('이름과 메모'),
           ),
           IconButton(
             onPressed: () => _addScores(context, ref),
             icon: const Icon(Icons.playlist_add),
-            tooltip: '곡 추가',
+            tooltip: tr('곡 추가'),
           ),
           IconButton(
             onPressed: () => shareSetlist(context, ref, setlistId, setlist.name),
             icon: const Icon(Icons.share_outlined),
-            tooltip: '공유',
+            tooltip: tr('공유'),
           ),
         ],
       ),
@@ -54,7 +55,7 @@ class SetlistDetailPage extends ConsumerWidget {
           : FloatingActionButton.extended(
               onPressed: () => context.push('/play/setlist/$setlistId'),
               icon: const Icon(Icons.play_arrow),
-              label: const Text('연주하기'),
+              label: Text(tr('연주하기')),
             ),
       body: Column(
         children: [
@@ -72,14 +73,14 @@ class SetlistDetailPage extends ConsumerWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                '${entries.length}곡 · 총 $totalPages쪽',
+                tr('{0}곡 · 총 {1}쪽', [entries.length, totalPages]),
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
           ),
           Expanded(
             child: entries.isEmpty
-                ? const Center(child: Text('오른쪽 위에서 곡을 추가하세요'))
+                ? Center(child: Text(tr('오른쪽 위에서 곡을 추가하세요')))
                 : ReorderableListView.builder(
                     padding: const EdgeInsets.only(bottom: 88),
                     itemCount: entries.length,
@@ -125,18 +126,18 @@ class SetlistDetailPage extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('세트리스트 정보'),
+        title: Text(tr('세트리스트 정보')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameCtl,
-              decoration: const InputDecoration(labelText: '이름'),
+              decoration: InputDecoration(labelText: tr('이름')),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: noteCtl,
-              decoration: const InputDecoration(labelText: '메모'),
+              decoration: InputDecoration(labelText: tr('메모')),
               maxLines: 3,
             ),
           ],
@@ -144,11 +145,11 @@ class SetlistDetailPage extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: Text(tr('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('저장'),
+            child: Text(tr('저장')),
           ),
         ],
       ),
@@ -170,7 +171,7 @@ class SetlistDetailPage extends ConsumerWidget {
     if (!context.mounted) return;
     final chosen = await showScoreCheckDialog(
       context,
-      title: '추가할 곡',
+      title: tr('추가할 곡'),
       scores: scores,
     );
     if (chosen == null || chosen.isEmpty) return;
@@ -216,13 +217,13 @@ class _EntryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final item = entry.item;
     final rangeText = item.startPage == null && item.endPage == null
-        ? '${entry.score.pageCount}쪽 전체'
-        : '${(item.startPage ?? 0) + 1}~${(item.endPage ?? entry.score.pageCount - 1) + 1}쪽';
+        ? tr('{0}쪽 전체', [entry.score.pageCount])
+        : tr('{0}~{1}쪽', [(item.startPage ?? 0) + 1, (item.endPage ?? entry.score.pageCount - 1) + 1]);
 
     return ListTile(
       leading: ReorderableDragStartListener(
         index: index,
-        child: const Icon(Icons.drag_handle),
+        child: Icon(Icons.drag_handle),
       ),
       title: Text(entry.score.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
@@ -246,9 +247,9 @@ class _EntryTile extends StatelessWidget {
               'remove' => onRemove(),
               _ => null,
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'range', child: Text('페이지 구간')),
-              PopupMenuItem(value: 'remove', child: Text('빼기')),
+            itemBuilder: (context) => [
+              PopupMenuItem(value: 'range', child: Text(tr('페이지 구간'))),
+              PopupMenuItem(value: 'remove', child: Text(tr('빼기'))),
             ],
           ),
         ],
@@ -287,17 +288,17 @@ class _RangeDialogState extends State<_RangeDialog> {
   Widget build(BuildContext context) {
     final last = (widget.entry.score.pageCount - 1).toDouble();
     return AlertDialog(
-      title: const Text('연주할 페이지 구간'),
+      title: Text(tr('연주할 페이지 구간')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           SwitchListTile(
-            title: const Text('곡 전체'),
+            title: Text(tr('곡 전체')),
             value: _whole,
             onChanged: (v) => setState(() => _whole = v),
           ),
           if (!_whole) ...[
-            Text('${_range.start.round() + 1}쪽 ~ ${_range.end.round() + 1}쪽'),
+            Text(tr('{0}쪽 ~ {1}쪽', [_range.start.round() + 1, _range.end.round() + 1])),
             RangeSlider(
               values: _range,
               min: 0,
@@ -311,7 +312,7 @@ class _RangeDialogState extends State<_RangeDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('취소'),
+          child: Text(tr('취소')),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(
@@ -320,7 +321,7 @@ class _RangeDialogState extends State<_RangeDialog> {
                 ? (null, null)
                 : (_range.start.round(), _range.end.round()),
           ),
-          child: const Text('저장'),
+          child: Text(tr('저장')),
         ),
       ],
     );

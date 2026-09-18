@@ -12,6 +12,7 @@ import '../../../core/db/database.dart';
 import '../../../core/db/score_dao.dart';
 import '../../../core/storage/app_paths.dart';
 import '../../library/data/cover_generator.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 암호가 걸린 PDF 를 만났을 때 사용자에게 물어보는 콜백.
 typedef PasswordPrompt = Future<String?> Function(String fileName);
@@ -43,7 +44,7 @@ class ScoreImporter {
   /// 사용자가 취소하면 null 을 준다.
   Future<ImportResult?> pickAndImport({PasswordPrompt? onPasswordNeeded}) async {
     final picked = await FilePicker.pickFiles(
-      dialogTitle: '가져올 PDF 악보 선택',
+      dialogTitle: tr('가져올 PDF 악보 선택'),
       type: FileType.custom,
       allowedExtensions: const ['pdf'],
     );
@@ -76,7 +77,7 @@ class ScoreImporter {
           title: titleOverride,
         );
         if (id == null) {
-          failures[name] = '암호를 입력하지 않아 건너뛰었습니다';
+          failures[name] = tr('암호를 입력하지 않아 건너뛰었습니다');
         } else {
           imported.add(id);
         }
@@ -130,7 +131,7 @@ class ScoreImporter {
       final pageCount = doc.pages.length;
       if (pageCount == 0) {
         await target.delete();
-        throw const FormatException('페이지가 없는 PDF 입니다');
+        throw FormatException(tr('페이지가 없는 PDF 입니다'));
       }
 
       // 표지는 실패해도 가져오기를 막지 않는다.
@@ -183,7 +184,7 @@ class ScoreImporter {
 
   String _describe(Object e) => switch (e) {
         FormatException(:final message) => message,
-        PathAccessException() => '파일을 읽을 권한이 없습니다',
+        PathAccessException() => tr('파일을 읽을 권한이 없습니다'),
         FileSystemException(:final message) => message,
         _ => '$e',
       };

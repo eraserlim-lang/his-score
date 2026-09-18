@@ -32,6 +32,7 @@ import 'widgets/jump_layer.dart';
 import 'widgets/paged_score_view.dart';
 import 'widgets/strip_score_view.dart';
 import 'widgets/viewer_toolbar.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 악보 보기 화면.
 class ViewerPage extends ConsumerWidget {
@@ -291,22 +292,22 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('텍스트'),
+        title: Text(tr('텍스트')),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLines: 3,
           minLines: 1,
-          decoration: const InputDecoration(hintText: 'rit. / 숨 쉬기 / 손가락 번호…'),
+          decoration: InputDecoration(hintText: tr('rit. / 숨 쉬기 / 손가락 번호…')),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
+            child: Text(tr('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('넣기'),
+            child: Text(tr('넣기')),
           ),
         ],
       ),
@@ -317,16 +318,16 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('전체 필기를 지울까요?'),
-        content: const Text('이 곡의 모든 페이지에서 필기와 스탬프가 지워집니다. 열린 페이지는 실행 취소로 되돌릴 수 있습니다.'),
+        title: Text(tr('전체 필기를 지울까요?')),
+        content: Text(tr('이 곡의 모든 페이지에서 필기와 스탬프가 지워집니다. 열린 페이지는 실행 취소로 되돌릴 수 있습니다.')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: Text(tr('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('지우기'),
+            child: Text(tr('지우기')),
           ),
         ],
       ),
@@ -430,14 +431,14 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text('빈 곳을 눌러 점프 버튼을 놓으세요'),
+                                Text(tr('빈 곳을 눌러 점프 버튼을 놓으세요')),
                                 const SizedBox(width: 8),
                                 FilledButton.tonal(
                                   onPressed: () {
                                     _controller.setEditingJumps(false);
                                     setState(() => _chromeVisible = true);
                                   },
-                                  child: const Text('완료'),
+                                  child: Text(tr('완료')),
                                 ),
                               ],
                             ),
@@ -511,7 +512,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                       child: IconButton.filledTonal(
                         onPressed: () => _controller.setPerformanceMode(false),
                         icon: const Icon(Icons.close),
-                        tooltip: '연주 모드 끝내기',
+                        tooltip: tr('연주 모드 끝내기'),
                       ),
                     ),
                 ],
@@ -589,9 +590,13 @@ class _TapZones extends StatelessWidget {
               top: 0,
               bottom: 0,
               width: sideWidth,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: () => onTap(_TapZone.previous),
+              child: Semantics(
+                button: true,
+                label: tr('이전 페이지'),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () => onTap(_TapZone.previous),
+                ),
               ),
             ),
             Positioned(
@@ -599,9 +604,13 @@ class _TapZones extends StatelessWidget {
               top: 0,
               bottom: 0,
               width: sideWidth,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: () => onTap(_TapZone.next),
+              child: Semantics(
+                button: true,
+                label: tr('다음 페이지'),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () => onTap(_TapZone.next),
+                ),
               ),
             ),
             Positioned(
@@ -609,9 +618,13 @@ class _TapZones extends StatelessWidget {
               right: sideWidth,
               top: 0,
               bottom: 0,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: () => onTap(_TapZone.center),
+              child: Semantics(
+                button: true,
+                label: tr('메뉴 보이기/숨기기'),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () => onTap(_TapZone.center),
+                ),
               ),
             ),
             // 왼쪽 위 모서리를 두 번 누르면 첫 페이지로 돌아간다.
@@ -691,7 +704,7 @@ class _PageSlider extends StatelessWidget {
             ),
         max: (state.pageCount - 1).toDouble(),
         divisions: state.pageCount - 1,
-        label: '${state.pageIndex + 1}쪽',
+        label: tr('{0}쪽', [state.pageIndex + 1]),
         onChanged: (v) => onChanged(v.round()),
       ),
     );
@@ -714,7 +727,7 @@ class _ErrorView extends StatelessWidget {
             const Icon(Icons.error_outline, size: 40, color: Colors.white70),
             const SizedBox(height: 12),
             Text(
-              '악보를 열지 못했습니다',
+              tr('악보를 열지 못했습니다'),
               style: Theme.of(context)
                   .textTheme
                   .titleMedium
@@ -729,7 +742,7 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton.tonal(
               onPressed: () => Navigator.of(context).maybePop(),
-              child: const Text('돌아가기'),
+              child: Text(tr('돌아가기')),
             ),
           ],
         ),
@@ -756,11 +769,11 @@ class _JumpTargetDialogState extends State<_JumpTargetDialog> {
   Widget build(BuildContext context) {
     final max = widget.session.documentFor(widget.page).pages.length;
     return AlertDialog(
-      title: const Text('어느 페이지로 갈까요?'),
+      title: Text(tr('어느 페이지로 갈까요?')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('$_target쪽', style: Theme.of(context).textTheme.headlineSmall),
+          Text(tr('{0}쪽', [_target]), style: Theme.of(context).textTheme.headlineSmall),
           Slider(
             value: _target.toDouble().clamp(1, max.toDouble()),
             min: 1,
@@ -784,10 +797,10 @@ class _JumpTargetDialogState extends State<_JumpTargetDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('취소'))),
         FilledButton(
           onPressed: () => Navigator.pop(context, _target),
-          child: const Text('놓기'),
+          child: Text(tr('놓기')),
         ),
       ],
     );

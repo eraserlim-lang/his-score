@@ -11,6 +11,7 @@ import '../domain/annotation_tool_state.dart';
 import '../domain/ink_models.dart';
 import 'ink_painter.dart';
 import 'pencilkit_canvas.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 페이지 위에 얹히는 필기 층.
 ///
@@ -389,12 +390,12 @@ class _InkLayerState extends State<InkLayer> {
                         IconButton.filledTonal(
                           onPressed: _editSelected,
                           icon: const Icon(Icons.edit, size: 18),
-                          tooltip: '내용 고치기',
+                          tooltip: tr('내용 고치기'),
                         ),
                         IconButton.filledTonal(
                           onPressed: _deleteSelected,
                           icon: const Icon(Icons.delete, size: 18),
-                          tooltip: '지우기',
+                          tooltip: tr('지우기'),
                         ),
                       ],
                     ),

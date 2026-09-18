@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/db/database.dart';
 import '../../../core/db/score_dao.dart';
 import '../../../core/db/tag_dao.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 태그 이름 바꾸기, 지우기, 태그에 속한 곡 편집.
 Future<void> showTagManagerSheet(BuildContext context) {
@@ -33,27 +34,27 @@ class _TagManager extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
-              Text('태그 관리', style: Theme.of(context).textTheme.titleLarge),
+              Text(tr('태그 관리'), style: Theme.of(context).textTheme.titleLarge),
               const Spacer(),
               TextButton.icon(
                 onPressed: () => _create(context, ref),
-                icon: const Icon(Icons.add),
-                label: const Text('새 태그'),
+                icon: Icon(Icons.add),
+                label: Text(tr('새 태그')),
               ),
             ],
           ),
         ),
         Expanded(
           child: tags.isEmpty
-              ? const Center(child: Text('태그가 없습니다'))
+              ? Center(child: Text(tr('태그가 없습니다')))
               : ListView.builder(
                   itemCount: tags.length,
                   itemBuilder: (context, i) {
                     final tag = tags[i];
                     return ListTile(
-                      leading: const Icon(Icons.tag),
+                      leading: Icon(Icons.tag),
                       title: Text(tag.name),
-                      subtitle: Text('${counts[tag.id] ?? 0}곡'),
+                      subtitle: Text(tr('{0}곡', [counts[tag.id] ?? 0])),
                       trailing: PopupMenuButton<String>(
                         onSelected: (v) => switch (v) {
                           'rename' => _rename(context, ref, tag),
@@ -61,10 +62,10 @@ class _TagManager extends ConsumerWidget {
                           'delete' => _delete(context, ref, tag),
                           _ => null,
                         },
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(value: 'scores', child: Text('곡 고르기')),
-                          PopupMenuItem(value: 'rename', child: Text('이름 바꾸기')),
-                          PopupMenuItem(value: 'delete', child: Text('지우기')),
+                        itemBuilder: (context) => [
+                          PopupMenuItem(value: 'scores', child: Text(tr('곡 고르기'))),
+                          PopupMenuItem(value: 'rename', child: Text(tr('이름 바꾸기'))),
+                          PopupMenuItem(value: 'delete', child: Text(tr('지우기'))),
                         ],
                       ),
                       onTap: () => _editScores(context, ref, tag),
@@ -77,13 +78,13 @@ class _TagManager extends ConsumerWidget {
   }
 
   Future<void> _create(BuildContext context, WidgetRef ref) async {
-    final name = await _askName(context, '새 태그', '');
+    final name = await _askName(context, tr('새 태그'), '');
     if (name == null || name.trim().isEmpty) return;
     await ref.read(tagDaoProvider).findOrCreate(name);
   }
 
   Future<void> _rename(BuildContext context, WidgetRef ref, Tag tag) async {
-    final name = await _askName(context, '이름 바꾸기', tag.name);
+    final name = await _askName(context, tr('이름 바꾸기'), tag.name);
     if (name == null || name.trim().isEmpty) return;
     await ref.read(tagDaoProvider).rename(tag.id, name);
   }
@@ -92,16 +93,16 @@ class _TagManager extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('"${tag.name}" 태그를 지울까요?'),
-        content: const Text('곡은 그대로 남고 태그만 떨어집니다.'),
+        title: Text(tr('"{0}" 태그를 지울까요?', [tag.name])),
+        content: Text(tr('곡은 그대로 남고 태그만 떨어집니다.')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: Text(tr('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('지우기'),
+            child: Text(tr('지우기')),
           ),
         ],
       ),
@@ -121,7 +122,7 @@ class _TagManager extends ConsumerWidget {
     final result = await showDialog<Set<String>>(
       context: context,
       builder: (context) => _ScoreCheckDialog(
-        title: '"${tag.name}" 에 넣을 곡',
+        title: tr('"{0}" 에 넣을 곡', [tag.name]),
         scores: scores,
         initial: current,
       ),
@@ -138,17 +139,17 @@ class _TagManager extends ConsumerWidget {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(labelText: '태그 이름'),
+          decoration: InputDecoration(labelText: tr('태그 이름')),
           onSubmitted: (v) => Navigator.pop(context, v),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
+            child: Text(tr('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('확인'),
+            child: Text(tr('확인')),
           ),
         ],
       ),
@@ -190,9 +191,9 @@ class _ScoreCheckDialogState extends State<_ScoreCheckDialog> {
         child: Column(
           children: [
             TextField(
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 prefixIcon: Icon(Icons.search),
-                hintText: '제목으로 찾기',
+                hintText: tr('제목으로 찾기'),
               ),
               onChanged: (v) => setState(() => _filter = v),
             ),
@@ -224,11 +225,11 @@ class _ScoreCheckDialogState extends State<_ScoreCheckDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('취소'),
+          child: Text(tr('취소')),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, _selected),
-          child: Text('저장 (${_selected.length})'),
+          child: Text(tr('저장 ({0})', [_selected.length])),
         ),
       ],
     );

@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/db/database.dart';
 import '../../../core/db/tables.dart';
+import '../../../core/i18n/tr.dart';
 
 part 'page_tools_dao.g.dart';
 
@@ -87,7 +88,7 @@ class PageToolsDao extends DatabaseAccessor<AppDatabase>
             id: _uuid.v4(),
             scoreId: scoreId,
             page: page,
-            label: node.title.trim().isEmpty ? '$page쪽' : node.title.trim(),
+            label: node.title.trim().isEmpty ? tr('{0}쪽', [page]) : node.title.trim(),
             depth: Value(depth),
             sortOrder: Value(order++),
           ),

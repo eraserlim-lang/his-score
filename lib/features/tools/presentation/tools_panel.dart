@@ -9,6 +9,7 @@ import '../domain/music_player.dart';
 import '../domain/pitch.dart';
 import '../domain/recorder.dart';
 import '../domain/tuner.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 음악 도구 종류.
 enum MusicTool {
@@ -74,7 +75,7 @@ class ToolRail extends ConsumerWidget {
           children: [
             for (final t in MusicTool.values)
               IconButton(
-                tooltip: t.label,
+                tooltip: tr(t.label),
                 isSelected: active(t),
                 icon: Icon(t.icon),
                 onPressed: () => showMusicTool(context, t, scoreId: scoreId),
@@ -139,7 +140,7 @@ class MetronomePanel extends ConsumerWidget {
           runSpacing: 4,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            const Text('박자'),
+            Text(tr('박자')),
             for (final n in [2, 3, 4, 5, 6, 7])
               ChoiceChip(
                 label: Text('$n'),
@@ -147,7 +148,7 @@ class MetronomePanel extends ConsumerWidget {
                 onSelected: (_) => m.setBeatsPerBar(n),
               ),
             const SizedBox(width: 12),
-            const Text('분할'),
+            Text(tr('분할')),
             for (final (n, l) in [(1, '♩'), (2, '♫'), (3, '3'), (4, '4')])
               ChoiceChip(
                 label: Text(l),
@@ -159,13 +160,13 @@ class MetronomePanel extends ConsumerWidget {
         Row(
           children: [
             FilterChip(
-              label: const Text('첫 박 강세'),
+              label: Text(tr('첫 박 강세')),
               selected: m.accentFirst,
               onSelected: m.setAccentFirst,
             ),
             const SizedBox(width: 8),
             FilterChip(
-              label: const Text('무음'),
+              label: Text(tr('무음')),
               avatar: Icon(m.silent ? Icons.volume_off : Icons.volume_up, size: 16),
               selected: m.silent,
               onSelected: m.setSilent,
@@ -185,7 +186,7 @@ class MetronomePanel extends ConsumerWidget {
           child: FilledButton.icon(
             onPressed: m.toggle,
             icon: Icon(m.running ? Icons.stop : Icons.play_arrow),
-            label: Text(m.running ? '정지' : '시작'),
+            label: Text(m.running ? tr('정지') : tr('시작')),
           ),
         ),
       ],
@@ -197,7 +198,7 @@ class MetronomePanel extends ConsumerWidget {
     final v = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('템포'),
+        title: Text(tr('템포')),
         content: TextField(
           controller: c,
           autofocus: true,
@@ -205,7 +206,7 @@ class MetronomePanel extends ConsumerWidget {
           onSubmitted: (v) => Navigator.pop(context, v),
         ),
         actions: [
-          FilledButton(onPressed: () => Navigator.pop(context, c.text), child: const Text('확인')),
+          FilledButton(onPressed: () => Navigator.pop(context, c.text), child: Text(tr('확인'))),
         ],
       ),
     );
@@ -275,15 +276,15 @@ class KeyboardPanel extends ConsumerWidget {
       children: [
         Row(
           children: [
-            IconButton(onPressed: () => k.shiftOctave(-1), icon: const Icon(Icons.chevron_left), tooltip: '한 옥타브 아래'),
+            IconButton(onPressed: () => k.shiftOctave(-1), icon: const Icon(Icons.chevron_left), tooltip: tr('한 옥타브 아래')),
             Text(PitchReading.fromFrequency(PitchReading.frequencyOf(k.lowest)).label),
-            IconButton(onPressed: () => k.shiftOctave(1), icon: const Icon(Icons.chevron_right), tooltip: '한 옥타브 위'),
+            IconButton(onPressed: () => k.shiftOctave(1), icon: const Icon(Icons.chevron_right), tooltip: tr('한 옥타브 위')),
             const Spacer(),
-            const Text('크기'),
+            Text(tr('크기')),
             for (final n in [1, 2, 3])
               Padding(
                 padding: const EdgeInsets.only(left: 4),
-                child: ChoiceChip(label: Text('$n옥타브'), selected: k.octaves == n, onSelected: (_) => k.setOctaves(n)),
+                child: ChoiceChip(label: Text(tr('{0}옥타브', [n])), selected: k.octaves == n, onSelected: (_) => k.setOctaves(n)),
               ),
           ],
         ),
@@ -469,7 +470,7 @@ class _TunerPanelState extends ConsumerState<TunerPanel> {
           style: Theme.of(context).textTheme.displayMedium?.copyWith(color: inTune ? Colors.green : null),
         ),
         Text(
-          transposed == null ? '소리를 내 보세요' : '${transposed.frequency.toStringAsFixed(1)} Hz · ${cents >= 0 ? '+' : ''}${cents.toStringAsFixed(0)}¢',
+          transposed == null ? tr('소리를 내 보세요') : '${transposed.frequency.toStringAsFixed(1)} Hz · ${cents >= 0 ? '+' : ''}${cents.toStringAsFixed(0)}¢',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 12),
@@ -481,7 +482,7 @@ class _TunerPanelState extends ConsumerState<TunerPanel> {
         ),
         Row(
           children: [
-            const Text('이조'),
+            Text(tr('이조')),
             const SizedBox(width: 8),
             for (final (semi, name) in [(0, 'C'), (-2, 'B♭'), (-9, 'E♭'), (-7, 'F')])
               Padding(
@@ -493,7 +494,7 @@ class _TunerPanelState extends ConsumerState<TunerPanel> {
         const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerLeft,
-          child: Text('기준음', style: Theme.of(context).textTheme.labelLarge),
+          child: Text(tr('기준음'), style: Theme.of(context).textTheme.labelLarge),
         ),
         Wrap(
           spacing: 6,
@@ -568,9 +569,9 @@ class RecorderPanel extends ConsumerWidget {
                 style: FilledButton.styleFrom(backgroundColor: r.recording ? scheme.error : null),
                 onPressed: r.recording ? r.stop : r.start,
                 icon: Icon(r.recording ? Icons.stop : Icons.fiber_manual_record),
-                label: Text(r.recording ? '정지 ${_fmt(r.elapsed)}' : '녹음'),
+                label: Text(r.recording ? tr('정지 {0}', [_fmt(r.elapsed)]) : tr('녹음')),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: LinearProgressIndicator(
                   value: r.recording ? r.amplitude : 0,
@@ -580,10 +581,10 @@ class RecorderPanel extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Expanded(
             child: list.isEmpty
-                ? const Center(child: Text('녹음이 없습니다'))
+                ? Center(child: Text(tr('녹음이 없습니다')))
                 : ListView.builder(
                     itemCount: list.length,
                     itemBuilder: (context, i) {
@@ -613,10 +614,10 @@ class RecorderPanel extends ConsumerWidget {
                                     await r.delete(rec);
                                 }
                               },
-                              itemBuilder: (context) => const [
-                                PopupMenuItem(value: 'share', child: Text('공유 / 내보내기')),
-                                PopupMenuItem(value: 'rename', child: Text('이름 바꾸기')),
-                                PopupMenuItem(value: 'delete', child: Text('지우기')),
+                              itemBuilder: (context) => [
+                                PopupMenuItem(value: 'share', child: Text(tr('공유 / 내보내기'))),
+                                PopupMenuItem(value: 'rename', child: Text(tr('이름 바꾸기'))),
+                                PopupMenuItem(value: 'delete', child: Text(tr('지우기'))),
                               ],
                             ),
                           ),
@@ -643,11 +644,11 @@ class RecorderPanel extends ConsumerWidget {
     final v = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('이름'),
+        title: Text(tr('이름')),
         content: TextField(controller: c, autofocus: true),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(context, c.text.trim()), child: const Text('확인')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('취소'))),
+          FilledButton(onPressed: () => Navigator.pop(context, c.text.trim()), child: Text(tr('확인'))),
         ],
       ),
     );
@@ -690,7 +691,7 @@ class PlayerPanel extends ConsumerWidget {
                   onPressed: () => p.setLoop(!p.loop),
                   isSelected: p.loop,
                   icon: const Icon(Icons.repeat),
-                  tooltip: '반복',
+                  tooltip: tr('반복'),
                 ),
               ],
             ),
@@ -704,23 +705,23 @@ class PlayerPanel extends ConsumerWidget {
           ],
           Row(
             children: [
-              Text('음원', style: Theme.of(context).textTheme.labelLarge),
+              Text(tr('음원'), style: Theme.of(context).textTheme.labelLarge),
               const Spacer(),
               TextButton.icon(
                 onPressed: () async {
                   final n = await p.pickAndAdd();
                   if (context.mounted && n > 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$n개를 추가했습니다')));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('{0}개를 추가했습니다', [n]))));
                   }
                 },
                 icon: const Icon(Icons.add),
-                label: const Text('음원 추가'),
+                label: Text(tr('음원 추가')),
               ),
             ],
           ),
           Expanded(
             child: p.tracks.isEmpty
-                ? const Center(child: Text('MP3, WAV, FLAC, OGG 파일을 추가하세요'))
+                ? Center(child: Text(tr('MP3, WAV, FLAC, OGG 파일을 추가하세요')))
                 : ListView.builder(
                     itemCount: p.tracks.length,
                     itemBuilder: (context, i) {

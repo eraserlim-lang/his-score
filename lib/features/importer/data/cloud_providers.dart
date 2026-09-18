@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../core/db/settings_dao.dart';
 import 'oauth_client.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 클라우드 폴더 안의 항목 하나.
 class CloudEntry {
@@ -74,7 +75,7 @@ class GoogleDriveProvider implements CloudProvider {
 
   Future<Map<String, String>> _headers() async {
     final token = await _oauth.accessToken();
-    if (token == null) throw StateError('로그인이 필요합니다');
+    if (token == null) throw StateError(tr('로그인이 필요합니다'));
     return {'Authorization': 'Bearer $token'};
   }
 
@@ -116,7 +117,7 @@ class GoogleDriveProvider implements CloudProvider {
   Future<void> download(CloudEntry entry, File target) async {
     final uri = Uri.https('www.googleapis.com', '/drive/v3/files/${entry.id}', {'alt': 'media'});
     final res = await http.get(uri, headers: await _headers());
-    if (res.statusCode != 200) throw HttpException('Drive 다운로드 ${res.statusCode}');
+    if (res.statusCode != 200) throw HttpException(tr('Drive 다운로드 {0}', [res.statusCode]));
     await target.writeAsBytes(res.bodyBytes, flush: true);
   }
 }
@@ -151,7 +152,7 @@ class DropboxProvider implements CloudProvider {
 
   Future<Map<String, String>> _headers() async {
     final token = await _oauth.accessToken();
-    if (token == null) throw StateError('로그인이 필요합니다');
+    if (token == null) throw StateError(tr('로그인이 필요합니다'));
     return {'Authorization': 'Bearer $token'};
   }
 
@@ -203,7 +204,7 @@ class DropboxProvider implements CloudProvider {
         'Dropbox-API-Arg': jsonEncode({'path': entry.id}),
       },
     );
-    if (res.statusCode != 200) throw HttpException('Dropbox 다운로드 ${res.statusCode}');
+    if (res.statusCode != 200) throw HttpException(tr('Dropbox 다운로드 {0}', [res.statusCode]));
     await target.writeAsBytes(res.bodyBytes, flush: true);
   }
 }

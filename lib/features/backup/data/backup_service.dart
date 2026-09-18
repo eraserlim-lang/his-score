@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../core/db/database.dart';
 import '../../../core/storage/app_paths.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 전체 백업과 복원.
 ///
@@ -39,7 +40,7 @@ class BackupService {
       ];
 
   Future<Uint8List> createBackup({void Function(String stage)? onStage}) async {
-    onStage?.call('데이터를 모으는 중');
+    onStage?.call(tr('데이터를 모으는 중'));
     final data = <String, dynamic>{
       'format': 'hiscore-backup',
       'version': formatVersion,
@@ -56,7 +57,7 @@ class BackupService {
     final archive = Archive();
     archive.addFile(ArchiveFile.bytes('data.json', utf8.encode(jsonEncode(data))));
 
-    onStage?.call('파일을 담는 중');
+    onStage?.call(tr('파일을 담는 중'));
     for (final dir in [_paths.scoresDir, _paths.coversDir, _paths.recordingsDir, Directory(p.join(_paths.docsRoot.path, 'audio'))]) {
       if (!dir.existsSync()) continue;
       await for (final entity in dir.list()) {
@@ -66,7 +67,7 @@ class BackupService {
       }
     }
 
-    onStage?.call('압축하는 중');
+    onStage?.call(tr('압축하는 중'));
     return ZipEncoder().encodeBytes(archive, level: DeflateLevel.bestSpeed);
   }
 
@@ -74,9 +75,9 @@ class BackupService {
   Future<BackupSummary> inspect(Uint8List zip) async {
     final archive = ZipDecoder().decodeBytes(zip);
     final entry = archive.findFile('data.json');
-    if (entry == null) throw const FormatException('data.json 이 없습니다');
+    if (entry == null) throw FormatException(tr('data.json 이 없습니다'));
     final data = jsonDecode(utf8.decode(entry.readBytes()!)) as Map<String, dynamic>;
-    if (data['format'] != 'hiscore-backup') throw const FormatException('HIScore 백업 파일이 아닙니다');
+    if (data['format'] != 'hiscore-backup') throw FormatException(tr('HIScore 백업 파일이 아닙니다'));
     final tables = data['tables'] as Map<String, dynamic>;
     return BackupSummary(
       createdAt: DateTime.tryParse(data['createdAt'] as String? ?? ''),
@@ -91,12 +92,12 @@ class BackupService {
   Future<void> restore(Uint8List zip, {void Function(String stage)? onStage}) async {
     final archive = ZipDecoder().decodeBytes(zip);
     final entry = archive.findFile('data.json');
-    if (entry == null) throw const FormatException('data.json 이 없습니다');
+    if (entry == null) throw FormatException(tr('data.json 이 없습니다'));
     final data = jsonDecode(utf8.decode(entry.readBytes()!)) as Map<String, dynamic>;
-    if (data['format'] != 'hiscore-backup') throw const FormatException('HIScore 백업 파일이 아닙니다');
+    if (data['format'] != 'hiscore-backup') throw FormatException(tr('HIScore 백업 파일이 아닙니다'));
     final tables = data['tables'] as Map<String, dynamic>;
 
-    onStage?.call('파일을 푸는 중');
+    onStage?.call(tr('파일을 푸는 중'));
     await _paths.ensureCreated();
     final kept = <String>{};
     for (final f in archive.files) {
@@ -121,7 +122,7 @@ class BackupService {
       }
     }
 
-    onStage?.call('데이터를 넣는 중');
+    onStage?.call(tr('데이터를 넣는 중'));
     await _db.transaction(() async {
       await _db.customStatement('PRAGMA foreign_keys = OFF');
       for (final table in _tables.reversed) {

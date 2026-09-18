@@ -9,6 +9,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 import '../domain/turn_input.dart';
 import '../domain/viewer_controller.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 얼굴 제스처 넘김.
 ///
@@ -54,7 +55,7 @@ class FaceTurnService extends ChangeNotifier {
       final front = cameras.where((c) => c.lensDirection == CameraLensDirection.front).firstOrNull ??
           cameras.firstOrNull;
       if (front == null) {
-        _error = '카메라가 없습니다';
+        _error = tr('카메라가 없습니다');
         notifyListeners();
         return;
       }
@@ -74,7 +75,7 @@ class FaceTurnService extends ChangeNotifier {
       await _camera!.startImageStream(_onFrame);
       _running = true;
     } on Object catch (e) {
-      _error = '카메라를 열 수 없습니다: $e';
+      _error = tr('카메라를 열 수 없습니다: {0}', [e]);
       await stop();
     }
     notifyListeners();

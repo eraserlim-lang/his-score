@@ -7,6 +7,7 @@ import 'package:record/record.dart';
 
 import '../data/audio_engine.dart';
 import 'pitch.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 크로매틱 튜너.
 ///
@@ -65,7 +66,7 @@ class TunerController extends ChangeNotifier {
     _error = null;
     try {
       if (!await _recorder.hasPermission()) {
-        _error = '마이크 권한이 없습니다';
+        _error = tr('마이크 권한이 없습니다');
         notifyListeners();
         return;
       }
@@ -82,7 +83,7 @@ class TunerController extends ChangeNotifier {
       _sub = stream.listen(_onChunk);
       _listening = true;
     } on Object catch (e) {
-      _error = '마이크를 열 수 없습니다: $e';
+      _error = tr('마이크를 열 수 없습니다: {0}', [e]);
     }
     notifyListeners();
   }

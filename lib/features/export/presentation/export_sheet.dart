@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/db/database.dart';
 import '../data/score_exporter.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 곡 내보내기. 필기 포함 여부, 페이지 구간, 저장/공유/인쇄.
 Future<void> showExportSheet(BuildContext context, {required Score score, required int visiblePageCount}) {
@@ -79,10 +80,10 @@ class _ExportBodyState extends ConsumerState<_ExportBody> {
             fileName: _fileName,
             bytes: bytes,
             mimeType: 'application/pdf',
-            dialogTitle: 'PDF 저장',
+            dialogTitle: tr('PDF 저장'),
           );
           if (uri != null && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('저장했습니다')));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('저장했습니다'))));
           }
         case _Target.share:
           await SharePlus.instance.share(
@@ -98,7 +99,7 @@ class _ExportBodyState extends ConsumerState<_ExportBody> {
       if (mounted) Navigator.pop(context);
     } on Object catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('내보내기 실패: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('내보내기 실패: {0}', [e]))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -112,12 +113,12 @@ class _ExportBodyState extends ConsumerState<_ExportBody> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('내보내기', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
+        Text(tr('내보내기'), style: Theme.of(context).textTheme.titleLarge),
+        SizedBox(height: 8),
         SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(value: false, label: Text('새로 만들기'), icon: Icon(Icons.auto_awesome)),
-            ButtonSegment(value: true, label: Text('원본 그대로'), icon: Icon(Icons.description_outlined)),
+          segments: [
+            ButtonSegment(value: false, label: Text(tr('새로 만들기')), icon: Icon(Icons.auto_awesome)),
+            ButtonSegment(value: true, label: Text(tr('원본 그대로')), icon: Icon(Icons.description_outlined)),
           ],
           selected: {_original},
           onSelectionChanged: (s) => setState(() => _original = s.first),
@@ -125,19 +126,19 @@ class _ExportBodyState extends ConsumerState<_ExportBody> {
         if (!_original) ...[
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('필기와 스탬프 포함'),
+            title: Text(tr('필기와 스탬프 포함')),
             value: _withInk,
             onChanged: (v) => setState(() => _withInk = v),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('페이지 편집 반영'),
-            subtitle: const Text('순서, 숨김, 여백 잘라내기'),
+            title: Text(tr('페이지 편집 반영')),
+            subtitle: Text(tr('순서, 숨김, 여백 잘라내기')),
             value: _applyEdits,
             onChanged: (v) => setState(() => _applyEdits = v),
           ),
           if (widget.pageCount > 1 && _applyEdits) ...[
-            Text('${_range.start.round() + 1}쪽 ~ ${_range.end.round() + 1}쪽'),
+            Text(tr('{0}쪽 ~ {1}쪽', [_range.start.round() + 1, _range.end.round() + 1])),
             RangeSlider(
               values: _range,
               max: last,
@@ -146,9 +147,9 @@ class _ExportBodyState extends ConsumerState<_ExportBody> {
             ),
           ],
         ] else
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text('가져온 PDF 파일을 그대로 보냅니다. 필기와 편집은 들어가지 않습니다.'),
+            child: Text(tr('가져온 PDF 파일을 그대로 보냅니다. 필기와 편집은 들어가지 않습니다.')),
           ),
         if (_busy) ...[
           const SizedBox(height: 8),
@@ -162,7 +163,7 @@ class _ExportBodyState extends ConsumerState<_ExportBody> {
               child: OutlinedButton.icon(
                 onPressed: _busy ? null : () => _run(_Target.save),
                 icon: const Icon(Icons.save_alt),
-                label: const Text('저장'),
+                label: Text(tr('저장')),
               ),
             ),
             const SizedBox(width: 8),
@@ -170,7 +171,7 @@ class _ExportBodyState extends ConsumerState<_ExportBody> {
               child: OutlinedButton.icon(
                 onPressed: _busy ? null : () => _run(_Target.share),
                 icon: const Icon(Icons.share_outlined),
-                label: const Text('공유'),
+                label: Text(tr('공유')),
               ),
             ),
             const SizedBox(width: 8),
@@ -178,7 +179,7 @@ class _ExportBodyState extends ConsumerState<_ExportBody> {
               child: FilledButton.icon(
                 onPressed: _busy ? null : () => _run(_Target.print),
                 icon: const Icon(Icons.print_outlined),
-                label: const Text('인쇄'),
+                label: Text(tr('인쇄')),
               ),
             ),
           ],

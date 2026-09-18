@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/i18n/tr.dart';
 import '../../data/page_render_cache.dart';
 import '../../data/score_session.dart';
 
@@ -113,7 +114,10 @@ class _ScorePageViewState extends State<ScorePageView> {
           );
         }
 
-        return AspectRatio(
+        return Semantics(
+          image: true,
+          label: tr('악보 페이지 {0}', [widget.page.sourcePageNumber]),
+          child: AspectRatio(
           aspectRatio: widget.page.aspectRatio,
           child: LayoutBuilder(
             builder: (context, inner) {
@@ -129,6 +133,7 @@ class _ScorePageViewState extends State<ScorePageView> {
                 children: [body, overlay],
               );
             },
+          ),
           ),
         );
       },

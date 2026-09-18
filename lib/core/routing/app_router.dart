@@ -56,7 +56,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/settings',
             pageBuilder: (context, state) =>
-                const NoTransitionPage(child: SettingsPage()),
+                NoTransitionPage(child: SettingsPage()),
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/db/tables.dart';
 import '../../data/face_turn_service.dart';
 import '../../domain/viewer_controller.dart';
+import '../../../../core/i18n/tr.dart';
 
 /// 하단 도구 막대. 레이아웃 전환과 자동 스크롤을 담는다.
 class ViewerToolbar extends StatelessWidget {
@@ -46,7 +47,7 @@ class ViewerToolbar extends StatelessWidget {
               if (state.isStrip)
                 IconButton(
                   onPressed: controller.toggleAutoScrolling,
-                  tooltip: state.autoScrolling ? '자동 스크롤 정지' : '자동 스크롤 시작',
+                  tooltip: state.autoScrolling ? tr('자동 스크롤 정지') : tr('자동 스크롤 시작'),
                   isSelected: state.autoScrolling,
                   icon: Icon(
                     state.autoScrolling ? Icons.pause : Icons.play_arrow,
@@ -59,52 +60,52 @@ class ViewerToolbar extends StatelessWidget {
               else
                 const Spacer(),
               PopupMenuButton<String>(
-                tooltip: '페이지 도구',
+                tooltip: tr('페이지 도구'),
                 icon: const Icon(Icons.auto_stories_outlined),
                 onSelected: onPageMenu,
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'bookmarks',
-                    child: ListTile(leading: Icon(Icons.bookmark_border), title: Text('북마크')),
+                    child: ListTile(leading: Icon(Icons.bookmark_border), title: Text(tr('북마크'))),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'crop',
-                    child: ListTile(leading: Icon(Icons.crop), title: Text('여백·기울기 조정')),
+                    child: ListTile(leading: Icon(Icons.crop), title: Text(tr('여백·기울기 조정'))),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'order',
-                    child: ListTile(leading: Icon(Icons.reorder), title: Text('페이지 순서 편집')),
+                    child: ListTile(leading: Icon(Icons.reorder), title: Text(tr('페이지 순서 편집'))),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'jumps',
-                    child: ListTile(leading: Icon(Icons.call_missed_outgoing), title: Text('점프 버튼 편집')),
+                    child: ListTile(leading: Icon(Icons.call_missed_outgoing), title: Text(tr('점프 버튼 편집'))),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'export',
-                    child: ListTile(leading: Icon(Icons.ios_share), title: Text('내보내기 · 인쇄')),
+                    child: ListTile(leading: Icon(Icons.ios_share), title: Text(tr('내보내기 · 인쇄'))),
                   ),
                   const PopupMenuDivider(),
                   if (state.layout == PageLayout.dual)
                     CheckedPopupMenuItem(
                       value: 'startOnRight',
                       checked: state.startOnRight,
-                      child: const Text('첫 장을 오른쪽에'),
+                      child: Text(tr('첫 장을 오른쪽에')),
                     ),
                   if (state.isPaged) ...[
                     CheckedPopupMenuItem(
                       value: 'anim_slide',
                       checked: state.animation == TurnAnimation.slide,
-                      child: const Text('넘김: 밀기'),
+                      child: Text(tr('넘김: 밀기')),
                     ),
                     CheckedPopupMenuItem(
                       value: 'anim_stack',
                       checked: state.animation == TurnAnimation.stack,
-                      child: const Text('넘김: 쌓기'),
+                      child: Text(tr('넘김: 쌓기')),
                     ),
                     CheckedPopupMenuItem(
                       value: 'anim_curl',
                       checked: state.animation == TurnAnimation.curl,
-                      child: const Text('넘김: 넘기기'),
+                      child: Text(tr('넘김: 넘기기')),
                     ),
                   ],
                 ],
@@ -116,8 +117,8 @@ class ViewerToolbar extends StatelessWidget {
                     onPressed: () => faceGesture!.running ? faceGesture!.stop() : faceGesture!.start(),
                     isSelected: faceGesture!.running,
                     tooltip: faceGesture!.running
-                        ? (faceGesture!.faceVisible ? '윙크 넘김 켜짐 (얼굴 인식 중)' : '윙크 넘김 켜짐 (얼굴을 찾는 중)')
-                        : '윙크로 넘기기',
+                        ? (faceGesture!.faceVisible ? tr('윙크 넘김 켜짐 (얼굴 인식 중)') : tr('윙크 넘김 켜짐 (얼굴을 찾는 중)'))
+                        : tr('윙크로 넘기기'),
                     icon: Icon(
                       faceGesture!.running
                           ? (faceGesture!.faceVisible ? Icons.face : Icons.face_retouching_off)
@@ -127,17 +128,17 @@ class ViewerToolbar extends StatelessWidget {
                 ),
               IconButton(
                 onPressed: onSync,
-                tooltip: '기기 동기화 / 리모컨',
+                tooltip: tr('기기 동기화 / 리모컨'),
                 icon: const Icon(Icons.devices_other_outlined),
               ),
               IconButton(
                 onPressed: () => controller.setAnnotating(true),
-                tooltip: '필기',
+                tooltip: tr('필기'),
                 icon: const Icon(Icons.draw_outlined),
               ),
               IconButton(
                 onPressed: () => controller.setPerformanceMode(true),
-                tooltip: '연주 모드',
+                tooltip: tr('연주 모드'),
                 icon: const Icon(Icons.music_note_outlined),
               ),
               const SizedBox(width: 8),
@@ -163,18 +164,18 @@ class _LayoutButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<PageLayout>(
-      tooltip: '보기 방식',
+      tooltip: tr('보기 방식'),
       initialValue: state.layout,
       onSelected: controller.setLayout,
       icon: Icon(_iconFor(state.layout)),
       itemBuilder: (context) => [
-        _item(PageLayout.single, Icons.crop_portrait, '1페이지', true),
-        _item(PageLayout.scroll, Icons.swap_vert, '세로 스크롤', true),
+        _item(PageLayout.single, Icons.crop_portrait, tr('1페이지'), true),
+        _item(PageLayout.scroll, Icons.swap_vert, tr('세로 스크롤'), true),
         // 반페이지는 다음 줄을 미리 보여주는 것이 목적이라 세로에서만 뜻이 있다.
-        _item(PageLayout.half, Icons.splitscreen, '반페이지', !isLandscape,
-            note: '세로 화면 전용'),
-        _item(PageLayout.dual, Icons.import_contacts, '2페이지', isLandscape,
-            note: '가로 화면 전용'),
+        _item(PageLayout.half, Icons.splitscreen, tr('반페이지'), !isLandscape,
+            note: tr('세로 화면 전용')),
+        _item(PageLayout.dual, Icons.import_contacts, tr('2페이지'), isLandscape,
+            note: tr('가로 화면 전용')),
       ],
     );
   }
@@ -235,7 +236,7 @@ class _SpeedSlider extends StatelessWidget {
         SizedBox(
           width: 52,
           child: Text(
-            '${minutes.toStringAsFixed(1)}분',
+            tr('{0}분', [minutes.toStringAsFixed(1)]),
             style: Theme.of(context).textTheme.labelSmall,
           ),
         ),

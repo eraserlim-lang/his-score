@@ -10,6 +10,7 @@ import '../../../core/db/score_dao.dart';
 import '../../../core/db/setlist_dao.dart';
 import '../../../core/storage/app_paths.dart';
 import '../../importer/data/score_importer.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 세트리스트 공유 형식.
 enum SetlistShareKind {
@@ -40,13 +41,13 @@ class SetlistShare {
   Future<String> asText(String setlistId) async {
     final setlist = await _setlists.findById(setlistId);
     final entries = await _setlists.entries(setlistId);
-    final b = StringBuffer(setlist?.name ?? '세트리스트')..writeln();
+    final b = StringBuffer(setlist?.name ?? tr('세트리스트'))..writeln();
     for (var i = 0; i < entries.length; i++) {
       final e = entries[i];
       b.write('${i + 1}. ${e.score.title}');
       if (e.score.artist != null) b.write(' - ${e.score.artist}');
       if (e.item.startPage != null || e.item.endPage != null) {
-        b.write(' (${(e.item.startPage ?? 0) + 1}~${(e.item.endPage ?? e.score.pageCount - 1) + 1}쪽)');
+        b.write(tr(' ({0}~{1}쪽)', [(e.item.startPage ?? 0) + 1, (e.item.endPage ?? e.score.pageCount - 1) + 1]));
       }
       b.writeln();
     }
@@ -55,7 +56,7 @@ class SetlistShare {
 
   Future<Map<String, dynamic>> asJson(String setlistId) async {
     final setlist = await _setlists.findById(setlistId);
-    if (setlist == null) throw StateError('세트리스트가 없습니다');
+    if (setlist == null) throw StateError(tr('세트리스트가 없습니다'));
     final entries = await _setlists.entries(setlistId);
     return {
       'format': 'hiscore-setlist',
@@ -107,12 +108,12 @@ class SetlistShare {
     if (p.extension(file.path).toLowerCase() == '.zip' || _looksLikeZip(bytes)) {
       archive = ZipDecoder().decodeBytes(bytes);
       final entry = archive.findFile('setlist.json');
-      if (entry == null) throw const FormatException('setlist.json 이 없는 zip 입니다');
+      if (entry == null) throw FormatException(tr('setlist.json 이 없는 zip 입니다'));
       json = jsonDecode(utf8.decode(entry.readBytes()!)) as Map<String, dynamic>;
     } else {
       json = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
     }
-    if (json['format'] != 'hiscore-setlist') throw const FormatException('HIScore 세트리스트 파일이 아닙니다');
+    if (json['format'] != 'hiscore-setlist') throw FormatException(tr('HIScore 세트리스트 파일이 아닙니다'));
     return importJson(json, archive: archive);
   }
 
@@ -161,11 +162,11 @@ class SetlistShare {
     }
 
     final name = (json['name'] as String?)?.trim();
-    final id = await _setlists.create(name == null || name.isEmpty ? '받은 세트리스트' : name, scoreIds);
+    final id = await _setlists.create(name == null || name.isEmpty ? tr('받은 세트리스트') : name, scoreIds);
     final note = json['note'] as String?;
-    final missingNote = missing.isEmpty ? null : '못 찾은 곡: ${missing.join(', ')}';
+    final missingNote = missing.isEmpty ? null : tr('못 찾은 곡: {0}', [missing.join(', ')]);
     final combined = [if (note != null && note.isNotEmpty) note, ?missingNote].join('\n');
-    if (combined.isNotEmpty) await _setlists.rename(id, name ?? '받은 세트리스트', note: combined);
+    if (combined.isNotEmpty) await _setlists.rename(id, name ?? tr('받은 세트리스트'), note: combined);
 
     final entries = await _setlists.entries(id);
     for (var i = 0; i < entries.length && i < ranges.length; i++) {

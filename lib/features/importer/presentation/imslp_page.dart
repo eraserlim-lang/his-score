@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/cloud_providers.dart' show tempDownloadFile;
 import '../data/imslp_client.dart';
 import '../data/score_importer.dart';
+import '../../../core/i18n/tr.dart';
 
 /// IMSLP 무료 클래식 악보 검색.
 class ImslpPage extends ConsumerStatefulWidget {
@@ -52,7 +53,7 @@ class _ImslpPageState extends ConsumerState<ImslpPage> {
       files = await _client.filesOf(work);
     } on Object catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('파일 목록을 가져오지 못했습니다: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('파일 목록을 가져오지 못했습니다: {0}', [e]))));
       return;
     }
     if (!mounted) return;
@@ -75,14 +76,14 @@ class _ImslpPageState extends ConsumerState<ImslpPage> {
                   IconButton(
                     onPressed: () => launchUrl(_client.pageUrl(work), mode: LaunchMode.externalApplication),
                     icon: const Icon(Icons.open_in_browser),
-                    tooltip: '브라우저에서 열기',
+                    tooltip: tr('브라우저에서 열기'),
                   ),
                 ],
               ),
             ),
             Expanded(
               child: files.isEmpty
-                  ? const Center(child: Text('이 페이지에서 PDF 를 찾지 못했습니다.\n브라우저에서 확인해 보세요.', textAlign: TextAlign.center))
+                  ? Center(child: Text(tr('이 페이지에서 PDF 를 찾지 못했습니다.\n브라우저에서 확인해 보세요.'), textAlign: TextAlign.center))
                   : ListView.builder(
                       itemCount: files.length,
                       itemBuilder: (context, i) => ListTile(
@@ -103,7 +104,7 @@ class _ImslpPageState extends ConsumerState<ImslpPage> {
 
   Future<void> _download(ImslpWork work, ImslpFile file) async {
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('내려받는 중…'), duration: Duration(seconds: 60)));
+    messenger.showSnackBar(SnackBar(content: Text(tr('내려받는 중…')), duration: Duration(seconds: 60)));
     final tmp = tempDownloadFile(Directory.systemTemp, 'imslp-${file.index}.pdf');
     try {
       await _client.download(file, tmp);
@@ -115,14 +116,14 @@ class _ImslpPageState extends ConsumerState<ImslpPage> {
         deleteSource: true,
       );
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(content: Text(id == null ? '가져오지 못했습니다' : '가져왔습니다: ${work.workName}')));
+      messenger.showSnackBar(SnackBar(content: Text(id == null ? tr('가져오지 못했습니다') : tr('가져왔습니다: {0}', [work.workName]))));
     } on Object catch (e) {
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
         SnackBar(
-          content: Text('내려받기 실패: $e'),
+          content: Text(tr('내려받기 실패: {0}', [e])),
           action: SnackBarAction(
-            label: '브라우저',
+            label: tr('브라우저'),
             onPressed: () => launchUrl(_client.pageUrl(work), mode: LaunchMode.externalApplication),
           ),
         ),
@@ -135,7 +136,7 @@ class _ImslpPageState extends ConsumerState<ImslpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('IMSLP 무료 클래식 악보')),
+      appBar: AppBar(title: Text(tr('IMSLP 무료 클래식 악보'))),
       body: Column(
         children: [
           Padding(
@@ -144,7 +145,7 @@ class _ImslpPageState extends ConsumerState<ImslpPage> {
               controller: _query,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: '작곡가, 곡명 (예: Chopin Nocturne)',
+                hintText: tr('작곡가, 곡명 (예: Chopin Nocturne)'),
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searching
                     ? const Padding(padding: EdgeInsets.all(12), child: SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)))
@@ -156,7 +157,7 @@ class _ImslpPageState extends ConsumerState<ImslpPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              '저작권이 만료된 악보를 IMSLP(Petrucci Music Library)에서 검색합니다. 이용 시 IMSLP 후원을 부탁드립니다.',
+              tr('저작권이 만료된 악보를 IMSLP(Petrucci Music Library)에서 검색합니다. 이용 시 IMSLP 후원을 부탁드립니다.'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -167,10 +168,10 @@ class _ImslpPageState extends ConsumerState<ImslpPage> {
   }
 
   Widget _body() {
-    if (_error != null) return Center(child: Text('검색 실패: $_error'));
+    if (_error != null) return Center(child: Text(tr('검색 실패: {0}', [_error])));
     final results = _results;
     if (results == null) return const SizedBox.shrink();
-    if (results.isEmpty) return const Center(child: Text('결과가 없습니다'));
+    if (results.isEmpty) return Center(child: Text(tr('결과가 없습니다')));
     return ListView.builder(
       itemCount: results.length,
       itemBuilder: (context, i) => ListTile(

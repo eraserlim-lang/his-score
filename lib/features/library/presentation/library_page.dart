@@ -13,6 +13,7 @@ import '../../setlist/presentation/setlist_picker.dart';
 import 'cover_image.dart';
 import 'score_info_sheet.dart';
 import 'tag_manager_sheet.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 조회 조건. 화면을 떠나도 유지되도록 화면 밖에 둔다.
 class LibraryQueryNotifier extends Notifier<ScoreQuery> {
@@ -79,16 +80,16 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('${targets.length}곡을 지울까요?'),
-        content: const Text('파일과 필기가 함께 지워지며 되돌릴 수 없습니다.'),
+        title: Text(tr('{0}곡을 지울까요?', [targets.length])),
+        content: Text(tr('파일과 필기가 함께 지워지며 되돌릴 수 없습니다.')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: Text(tr('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('지우기'),
+            child: Text(tr('지우기')),
           ),
         ],
       ),
@@ -122,7 +123,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     _clearSelection();
     if (mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('세트리스트에 추가했습니다')));
+          .showSnackBar(SnackBar(content: Text(tr('세트리스트에 추가했습니다'))));
     }
   }
 
@@ -141,23 +142,23 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 onPressed: _clearSelection,
                 icon: const Icon(Icons.close),
               ),
-              title: Text('${_selected.length}곡 선택'),
+              title: Text(tr('{0}곡 선택', [_selected.length])),
               actions: [
                 IconButton(
                   onPressed: _tagSelected,
                   icon: const Icon(Icons.tag),
-                  tooltip: '태그 붙이기',
+                  tooltip: tr('태그 붙이기'),
                 ),
                 IconButton(
                   onPressed: _addSelectedToSetlist,
                   icon: const Icon(Icons.playlist_add),
-                  tooltip: '세트리스트에 추가',
+                  tooltip: tr('세트리스트에 추가'),
                 ),
                 IconButton(
                   onPressed: () =>
-                      _deleteSelected(scoresAsync.value ?? const []),
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: '지우기',
+                      _deleteSelected(scoresAsync.value ?? []),
+                  icon: Icon(Icons.delete_outline),
+                  tooltip: tr('지우기'),
                 ),
               ],
             )
@@ -166,13 +167,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   ? TextField(
                       controller: _search,
                       autofocus: true,
-                      decoration: const InputDecoration(
-                        hintText: '제목, 아티스트, 작곡가',
+                      decoration: InputDecoration(
+                        hintText: tr('제목, 아티스트, 작곡가'),
                         border: InputBorder.none,
                       ),
                       onChanged: ref.read(libraryQueryProvider.notifier).setText,
                     )
-                  : const Text('악보'),
+                  : Text(tr('악보')),
               actions: [
                 IconButton(
                   onPressed: () {
@@ -183,23 +184,23 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     }
                   },
                   icon: Icon(_searching ? Icons.close : Icons.search),
-                  tooltip: '검색',
+                  tooltip: tr('검색'),
                 ),
                 IconButton(
                   onPressed: ref.read(_gridModeProvider.notifier).toggle,
                   icon: Icon(grid ? Icons.view_list : Icons.grid_view),
-                  tooltip: grid ? '목록으로 보기' : '격자로 보기',
+                  tooltip: grid ? tr('목록으로 보기') : tr('격자로 보기'),
                 ),
                 PopupMenuButton<ScoreSort>(
-                  tooltip: '정렬',
+                  tooltip: tr('정렬'),
                   initialValue: query.sort,
-                  icon: const Icon(Icons.sort),
+                  icon: Icon(Icons.sort),
                   onSelected: ref.read(libraryQueryProvider.notifier).setSort,
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: ScoreSort.recent, child: Text('최근 본 순')),
-                    PopupMenuItem(value: ScoreSort.title, child: Text('제목 순')),
-                    PopupMenuItem(value: ScoreSort.artist, child: Text('아티스트 순')),
-                    PopupMenuItem(value: ScoreSort.added, child: Text('추가한 순')),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(value: ScoreSort.recent, child: Text(tr('최근 본 순'))),
+                    PopupMenuItem(value: ScoreSort.title, child: Text(tr('제목 순'))),
+                    PopupMenuItem(value: ScoreSort.artist, child: Text(tr('아티스트 순'))),
+                    PopupMenuItem(value: ScoreSort.added, child: Text(tr('추가한 순'))),
                   ],
                 ),
               ],
@@ -223,11 +224,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           : FloatingActionButton.extended(
               onPressed: () => importPdfFiles(context, ref),
               icon: const Icon(Icons.add),
-              label: const Text('악보 추가'),
+              label: Text(tr('악보 추가')),
             ),
       body: scoresAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('목록을 불러오지 못했습니다\n$e')),
+        error: (e, _) => Center(child: Text(tr('목록을 불러오지 못했습니다\n{0}', [e]))),
         data: (scores) {
           if (scores.isEmpty) {
             return _EmptyState(
@@ -309,7 +310,7 @@ class _TagBar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 6),
               child: ActionChip(
-                label: const Text('전체'),
+                label: Text(tr('전체')),
                 avatar: const Icon(Icons.clear, size: 16),
                 onPressed: onClear,
               ),
@@ -326,7 +327,7 @@ class _TagBar extends StatelessWidget {
           IconButton(
             onPressed: onManage,
             icon: const Icon(Icons.edit_outlined, size: 18),
-            tooltip: '태그 관리',
+            tooltip: tr('태그 관리'),
           ),
         ],
       ),
@@ -394,7 +395,7 @@ class _ScoreCard extends StatelessWidget {
                         style: IconButton.styleFrom(
                           backgroundColor: Colors.white70,
                         ),
-                        tooltip: '정보',
+                        tooltip: tr('정보'),
                       ),
                     ),
                 ],
@@ -414,8 +415,8 @@ class _ScoreCard extends StatelessWidget {
                   ),
                   Text(
                     subtitle == null
-                        ? '${score.pageCount}쪽'
-                        : '$subtitle · ${score.pageCount}쪽',
+                        ? tr('{0}쪽', [score.pageCount])
+                        : tr('{0} · {1}쪽', [subtitle, score.pageCount]),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall,
@@ -466,7 +467,7 @@ class _ScoreTile extends StatelessWidget {
         [
           if (score.artist != null) score.artist!,
           if (score.composer != null) score.composer!,
-          '${score.pageCount}쪽',
+          tr('{0}쪽', [score.pageCount]),
         ].join(' · '),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -476,7 +477,7 @@ class _ScoreTile extends StatelessWidget {
           : IconButton(
               onPressed: onInfo,
               icon: const Icon(Icons.info_outline),
-              tooltip: '정보',
+              tooltip: tr('정보'),
             ),
     );
   }
@@ -503,7 +504,7 @@ class _PickTagDialogState extends State<_PickTagDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('태그 붙이기'),
+      title: Text(tr('태그 붙이기')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,7 +512,7 @@ class _PickTagDialogState extends State<_PickTagDialog> {
           TextField(
             controller: _controller,
             autofocus: true,
-            decoration: const InputDecoration(labelText: '새 태그 또는 기존 태그 이름'),
+            decoration: InputDecoration(labelText: tr('새 태그 또는 기존 태그 이름')),
             onSubmitted: (v) => Navigator.pop(context, v),
           ),
           if (widget.tags.isNotEmpty) ...[
@@ -532,11 +533,11 @@ class _PickTagDialogState extends State<_PickTagDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('취소'),
+          child: Text(tr('취소')),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, _controller.text),
-          child: const Text('붙이기'),
+          child: Text(tr('붙이기')),
         ),
       ],
     );
@@ -561,13 +562,13 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            hasFilter ? '조건에 맞는 악보가 없습니다' : '아직 악보가 없습니다',
+            hasFilter ? tr('조건에 맞는 악보가 없습니다') : tr('아직 악보가 없습니다'),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           if (!hasFilter) ...[
             const SizedBox(height: 4),
             Text(
-              'PDF 악보를 추가해 보세요',
+              tr('PDF 악보를 추가해 보세요'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

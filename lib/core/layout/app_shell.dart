@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/tr.dart';
 import 'breakpoints.dart';
 
 /// 목적지 하나. 폰에서는 하단 탭, 태블릿/데스크톱에서는 좌측 레일로 나온다.
@@ -74,7 +75,7 @@ class AppShell extends StatelessWidget {
               NavigationDestination(
                 icon: Icon(d.icon),
                 selectedIcon: Icon(d.selectedIcon),
-                label: d.label,
+                label: tr(d.label),
               ),
           ],
         ),
@@ -94,7 +95,7 @@ class AppShell extends StatelessWidget {
                 NavigationRailDestination(
                   icon: Icon(d.icon),
                   selectedIcon: Icon(d.selectedIcon),
-                  label: Text(d.label),
+                  label: Text(tr(d.label)),
                 ),
             ],
           ),

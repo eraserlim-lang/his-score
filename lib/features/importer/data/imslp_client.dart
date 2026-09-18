@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import '../../../core/i18n/tr.dart';
 
 /// IMSLP 검색 결과 한 건(작품 페이지).
 class ImslpWork {
@@ -55,7 +56,7 @@ class ImslpClient {
       'format': 'json',
     });
     final res = await _http.get(uri, headers: _headers);
-    if (res.statusCode != 200) throw HttpException('IMSLP 검색 실패 ${res.statusCode}');
+    if (res.statusCode != 200) throw HttpException(tr('IMSLP 검색 실패 {0}', [res.statusCode]));
     final j = jsonDecode(res.body) as Map<String, dynamic>;
     final hits = (j['query']?['search'] as List?) ?? const [];
     return [
@@ -76,7 +77,7 @@ class ImslpClient {
       'format': 'json',
     });
     final res = await _http.get(uri, headers: _headers);
-    if (res.statusCode != 200) throw HttpException('IMSLP 페이지 실패 ${res.statusCode}');
+    if (res.statusCode != 200) throw HttpException(tr('IMSLP 페이지 실패 {0}', [res.statusCode]));
     final j = jsonDecode(res.body) as Map<String, dynamic>;
     final html = (j['parse']?['text']?['*'] as String?) ?? '';
     return parseFiles(html);
@@ -100,7 +101,7 @@ class ImslpClient {
         );
         final titleRe = RegExp(r'class="we_file_info2"[^>]*>(.*?)<', dotAll: true);
         final t = titleRe.allMatches(window).lastOrNull;
-        desc = t == null ? '파일 #$index' : _stripTags(t.group(1)!).trim();
+        desc = t == null ? tr('파일 #{0}', [index]) : _stripTags(t.group(1)!).trim();
       }
       final pagesRe = RegExp(r'(\d+)\s*pp');
       final after = html.substring(m.end, (m.end + 300).clamp(0, html.length));
@@ -147,9 +148,9 @@ class ImslpClient {
         uri = uri.resolve(cont.group(1)!.replaceAll('&amp;', '&'));
         continue;
       }
-      throw const HttpException('PDF 를 받지 못했습니다. IMSLP 사이트 구조가 바뀌었을 수 있습니다.');
+      throw HttpException(tr('PDF 를 받지 못했습니다. IMSLP 사이트 구조가 바뀌었을 수 있습니다.'));
     }
-    throw const HttpException('리디렉션이 너무 많습니다');
+    throw HttpException(tr('리디렉션이 너무 많습니다'));
   }
 
   Uri pageUrl(ImslpWork work) => Uri.parse('$_base/wiki/${Uri.encodeComponent(work.title.replaceAll(' ', '_'))}');

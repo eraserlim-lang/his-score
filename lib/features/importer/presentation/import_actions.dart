@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/score_importer.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 파일 선택 창을 띄워 PDF 를 가져오고 결과를 알린다.
 ///
@@ -19,16 +20,16 @@ Future<void> importPdfFiles(BuildContext context, WidgetRef ref) async {
   if (!context.mounted) return;
 
   final parts = <String>[
-    if (result.imported.isNotEmpty) '${result.imported.length}개 추가',
-    if (result.hasFailures) '${result.failures.length}개 실패',
+    if (result.imported.isNotEmpty) tr('{0}개 추가', [result.imported.length]),
+    if (result.hasFailures) tr('{0}개 실패', [result.failures.length]),
   ];
 
   messenger.showSnackBar(
     SnackBar(
-      content: Text(parts.isEmpty ? '가져온 악보가 없습니다' : parts.join(', ')),
+      content: Text(parts.isEmpty ? tr('가져온 악보가 없습니다') : parts.join(', ')),
       action: result.hasFailures
           ? SnackBarAction(
-              label: '자세히',
+              label: tr('자세히'),
               onPressed: () => _showFailures(context, result.failures),
             )
           : null,
@@ -41,7 +42,7 @@ Future<String?> _askPassword(BuildContext context, String fileName) {
   return showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('암호가 걸린 악보'),
+      title: Text(tr('암호가 걸린 악보')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,7 +53,7 @@ Future<String?> _askPassword(BuildContext context, String fileName) {
             controller: controller,
             obscureText: true,
             autofocus: true,
-            decoration: const InputDecoration(labelText: '암호'),
+            decoration: InputDecoration(labelText: tr('암호')),
             onSubmitted: (v) => Navigator.pop(context, v),
           ),
         ],
@@ -60,11 +61,11 @@ Future<String?> _askPassword(BuildContext context, String fileName) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('건너뛰기'),
+          child: Text(tr('건너뛰기')),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, controller.text),
-          child: const Text('열기'),
+          child: Text(tr('열기')),
         ),
       ],
     ),
@@ -75,7 +76,7 @@ void _showFailures(BuildContext context, Map<String, String> failures) {
   showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('가져오지 못한 파일'),
+      title: Text(tr('가져오지 못한 파일')),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -104,7 +105,7 @@ void _showFailures(BuildContext context, Map<String, String> failures) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('닫기'),
+          child: Text(tr('닫기')),
         ),
       ],
     ),

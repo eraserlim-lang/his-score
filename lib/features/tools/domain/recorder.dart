@@ -14,6 +14,7 @@ import '../../../core/db/database.dart';
 import '../../../core/db/tables.dart';
 import '../../../core/storage/app_paths.dart';
 import '../data/audio_engine.dart';
+import '../../../core/i18n/tr.dart';
 
 part 'recorder.g.dart';
 
@@ -94,7 +95,7 @@ class RecorderController extends ChangeNotifier {
     _error = null;
     try {
       if (!await _recorder.hasPermission()) {
-        _error = '마이크 권한이 없습니다';
+        _error = tr('마이크 권한이 없습니다');
         notifyListeners();
         return;
       }
@@ -113,7 +114,7 @@ class RecorderController extends ChangeNotifier {
       });
       _clock = Timer.periodic(const Duration(milliseconds: 250), (_) => notifyListeners());
     } on Object catch (e) {
-      _error = '녹음을 시작할 수 없습니다: $e';
+      _error = tr('녹음을 시작할 수 없습니다: {0}', [e]);
     }
     notifyListeners();
   }
@@ -136,7 +137,7 @@ class RecorderController extends ChangeNotifier {
       RecordingsCompanion.insert(
         id: _uuid.v4(),
         scoreId: Value(contextScoreId),
-        title: '녹음 ${_label(DateTime.now())}',
+        title: tr('녹음 {0}', [_label(DateTime.now())]),
         filePath: _paths.relativeOf(file),
         durationMs: Value(duration.inMilliseconds),
       ),
@@ -156,7 +157,7 @@ class RecorderController extends ChangeNotifier {
     if (!await _engine.ensureReady()) return;
     final file = _paths.resolve(r.filePath);
     if (!await file.exists()) {
-      _error = '파일이 없습니다';
+      _error = tr('파일이 없습니다');
       notifyListeners();
       return;
     }

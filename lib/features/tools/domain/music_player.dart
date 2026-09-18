@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../core/storage/app_paths.dart';
 import '../data/audio_engine.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 연주하며 들을 반주 음원.
 class PlayerTrack {
@@ -63,7 +64,7 @@ class MusicPlayerController extends ChangeNotifier {
   /// 파일 선택 창에서 골라 앱 폴더로 복사한다.
   Future<int> pickAndAdd() async {
     final picked = await FilePicker.pickFiles(
-      dialogTitle: '반주 음원 선택',
+      dialogTitle: tr('반주 음원 선택'),
       type: FileType.custom,
       allowedExtensions: supported,
     );

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/cloud_providers.dart';
 import '../data/score_importer.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 클라우드 폴더 탐색기. PDF 를 골라 내려받고 가져온다.
 ///
@@ -20,7 +21,7 @@ class CloudBrowserPage extends ConsumerStatefulWidget {
 
 class _CloudBrowserPageState extends ConsumerState<CloudBrowserPage> {
   /// 폴더 이동 기록. 마지막이 현재 폴더다. (id, 이름)
-  final _stack = <(String?, String)>[(null, '내 파일')];
+  final _stack = <(String?, String)>[(null, tr('내 파일'))];
   List<CloudEntry>? _entries;
   String? _error;
   bool _signedIn = false;
@@ -47,7 +48,7 @@ class _CloudBrowserPageState extends ConsumerState<CloudBrowserPage> {
     final ok = await widget.provider.signIn();
     if (!mounted) return;
     if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('로그인이 취소되었거나 실패했습니다')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('로그인이 취소되었거나 실패했습니다'))));
       return;
     }
     _signedIn = true;
@@ -99,7 +100,7 @@ class _CloudBrowserPageState extends ConsumerState<CloudBrowserPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          failures.isEmpty ? '$ok개를 가져왔습니다' : '$ok개 성공, ${failures.length}개 실패',
+          failures.isEmpty ? tr('{0}개를 가져왔습니다', [ok]) : tr('{0}개 성공, {1}개 실패', [ok, failures.length]),
         ),
       ),
     );
@@ -125,7 +126,7 @@ class _CloudBrowserPageState extends ConsumerState<CloudBrowserPage> {
                     ? null
                     : () => _importEntries(_entries!.where((e) => e.isPdf).toList()),
                 icon: const Icon(Icons.cloud_download_outlined),
-                tooltip: '이 폴더의 PDF 전부 가져오기',
+                tooltip: tr('이 폴더의 PDF 전부 가져오기'),
               ),
             if (_signedIn)
               IconButton(
@@ -134,7 +135,7 @@ class _CloudBrowserPageState extends ConsumerState<CloudBrowserPage> {
                   if (mounted) setState(() => _signedIn = false);
                 },
                 icon: const Icon(Icons.logout),
-                tooltip: '로그아웃',
+                tooltip: tr('로그아웃'),
               ),
           ],
         ),
@@ -152,8 +153,8 @@ class _CloudBrowserPageState extends ConsumerState<CloudBrowserPage> {
     if (!provider.isConfigured) {
       return _Message(
         icon: Icons.key_off_outlined,
-        title: '${provider.label} 클라이언트 ID 가 없습니다',
-        detail: '설정 화면에서 OAuth 클라이언트 ID 를 넣으면 연결할 수 있습니다.',
+        title: tr('{0} 클라이언트 ID 가 없습니다', [provider.label]),
+        detail: tr('설정 화면에서 OAuth 클라이언트 ID 를 넣으면 연결할 수 있습니다.'),
       );
     }
     if (!_signedIn) {
@@ -161,21 +162,21 @@ class _CloudBrowserPageState extends ConsumerState<CloudBrowserPage> {
         child: FilledButton.icon(
           onPressed: _signIn,
           icon: const Icon(Icons.login),
-          label: Text('${provider.label} 로그인'),
+          label: Text(tr('{0} 로그인', [provider.label])),
         ),
       );
     }
     if (_error != null) {
       return _Message(
         icon: Icons.error_outline,
-        title: '목록을 가져오지 못했습니다',
+        title: tr('목록을 가져오지 못했습니다'),
         detail: _error!,
-        action: TextButton(onPressed: _load, child: const Text('다시 시도')),
+        action: TextButton(onPressed: _load, child: Text(tr('다시 시도'))),
       );
     }
     final entries = _entries;
     if (entries == null) return const Center(child: CircularProgressIndicator());
-    if (entries.isEmpty) return const _Message(icon: Icons.folder_off_outlined, title: 'PDF 가 없습니다');
+    if (entries.isEmpty) return _Message(icon: Icons.folder_off_outlined, title: tr('PDF 가 없습니다'));
 
     return ListView.builder(
       itemCount: entries.length,

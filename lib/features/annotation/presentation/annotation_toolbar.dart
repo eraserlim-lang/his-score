@@ -7,6 +7,7 @@ import '../domain/annotation_tool_state.dart';
 import '../domain/ink_models.dart';
 import '../domain/stamps.dart';
 import 'ink_painter.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 필기 도구 막대.
 ///
@@ -51,20 +52,20 @@ class AnnotationToolbar extends StatelessWidget {
                     icon: Icon(
                       tools.toolbarAtBottom ? Icons.vertical_align_top : Icons.vertical_align_bottom,
                     ),
-                    tooltip: tools.toolbarAtBottom ? '위로 옮기기' : '아래로 옮기기',
+                    tooltip: tools.toolbarAtBottom ? tr('위로 옮기기') : tr('아래로 옮기기'),
                   ),
                   const VerticalDivider(indent: 12, endIndent: 12),
                   for (final preset in PenPreset.values)
                     _ToolButton(
                       icon: _presetIcon(preset),
-                      label: preset.label,
+                      label: tr(preset.label),
                       selected: tools.tool == InkTool.pen && tools.preset == preset,
                       onTap: () => tools.setPreset(preset),
                       onLongPress: () => _showWidth(context),
                     ),
                   _ToolButton(
                     icon: Icons.auto_fix_normal,
-                    label: '지우개',
+                    label: tr('지우개'),
                     selected: tools.tool == InkTool.eraser,
                     onTap: () => tools.setTool(InkTool.eraser),
                     onLongPress: () => _showEraser(context),
@@ -72,26 +73,26 @@ class AnnotationToolbar extends StatelessWidget {
                   const VerticalDivider(indent: 12, endIndent: 12),
                   _ToolButton(
                     icon: Icons.music_note,
-                    label: '스탬프',
+                    label: tr('스탬프'),
                     selected: tools.tool == InkTool.stamp,
                     onTap: () => _showStamps(context),
                   ),
                   _ToolButton(
                     icon: Icons.text_fields,
-                    label: '텍스트',
+                    label: tr('텍스트'),
                     selected: tools.tool == InkTool.text,
                     onTap: () => tools.setTool(InkTool.text),
                     onLongPress: () => _showTextSize(context),
                   ),
                   _ToolButton(
                     icon: Icons.timeline,
-                    label: '도형',
+                    label: tr('도형'),
                     selected: tools.tool == InkTool.shape,
                     onTap: () => _showShapes(context),
                   ),
                   _ToolButton(
                     icon: Icons.open_with,
-                    label: '선택',
+                    label: tr('선택'),
                     selected: tools.tool == InkTool.select,
                     onTap: () => tools.setTool(InkTool.select),
                   ),
@@ -106,16 +107,16 @@ class AnnotationToolbar extends StatelessWidget {
                   IconButton(
                     onPressed: pageController?.canUndo == true ? pageController!.undo : null,
                     icon: const Icon(Icons.undo),
-                    tooltip: '실행 취소',
+                    tooltip: tr('실행 취소'),
                   ),
                   IconButton(
                     onPressed: pageController?.canRedo == true ? pageController!.redo : null,
                     icon: const Icon(Icons.redo),
-                    tooltip: '다시 실행',
+                    tooltip: tr('다시 실행'),
                   ),
                   PopupMenuButton<String>(
-                    tooltip: '지우기',
-                    icon: const Icon(Icons.delete_sweep_outlined),
+                    tooltip: tr('지우기'),
+                    icon: Icon(Icons.delete_sweep_outlined),
                     onSelected: (v) {
                       if (v == 'page') {
                         pageController?.clear();
@@ -123,9 +124,9 @@ class AnnotationToolbar extends StatelessWidget {
                         onClearAll();
                       }
                     },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(value: 'page', child: Text('이 페이지 필기 지우기')),
-                      PopupMenuItem(value: 'all', child: Text('전체 페이지 필기 지우기')),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(value: 'page', child: Text(tr('이 페이지 필기 지우기'))),
+                      PopupMenuItem(value: 'all', child: Text(tr('전체 페이지 필기 지우기'))),
                     ],
                   ),
                   if (tools.stylusSeen)
@@ -133,13 +134,13 @@ class AnnotationToolbar extends StatelessWidget {
                       onPressed: () => tools.setFingerDraws(!tools.fingerDraws),
                       isSelected: tools.fingerDraws,
                       icon: const Icon(Icons.touch_app_outlined),
-                      tooltip: tools.fingerDraws ? '손가락: 그리기' : '손가락: 페이지 넘김',
+                      tooltip: tools.fingerDraws ? tr('손가락: 그리기') : tr('손가락: 페이지 넘김'),
                     ),
                   const VerticalDivider(indent: 12, endIndent: 12),
                   IconButton(
                     onPressed: onClose,
                     icon: const Icon(Icons.close),
-                    tooltip: '필기 끝내기',
+                    tooltip: tr('필기 끝내기'),
                   ),
                 ],
               ),
@@ -161,7 +162,7 @@ class AnnotationToolbar extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       builder: (context) => _SliderSheet(
-        title: '펜 굵기',
+        title: tr('펜 굵기'),
         listenable: tools,
         value: () => tools.width,
         min: 0.4,
@@ -179,7 +180,7 @@ class AnnotationToolbar extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       builder: (context) => _SliderSheet(
-        title: '지우개 크기',
+        title: tr('지우개 크기'),
         listenable: tools,
         value: () => tools.eraserRadius,
         min: 6,
@@ -206,7 +207,7 @@ class AnnotationToolbar extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       builder: (context) => _SliderSheet(
-        title: '글자 크기',
+        title: tr('글자 크기'),
         listenable: tools,
         value: () => tools.textSize,
         min: 10,
@@ -255,7 +256,7 @@ class AnnotationToolbar extends StatelessWidget {
                   height: 28,
                   child: CustomPaint(painter: _ShapePreview(kind, tools.color)),
                 ),
-                title: Text(kind.label),
+                title: Text(tr(kind.label)),
                 selected: tools.shape == kind,
                 onTap: () {
                   tools.setShape(kind);
@@ -288,7 +289,7 @@ class _ToolButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Tooltip(
-      message: onLongPress == null ? label : '$label (길게 눌러 설정)',
+      message: onLongPress == null ? label : tr('{0} (길게 눌러 설정)', [label]),
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
@@ -468,7 +469,7 @@ class StampPalette extends StatelessWidget {
         for (final group in stampGroups) ...[
           Padding(
             padding: const EdgeInsets.only(top: 12, bottom: 6),
-            child: Text(group.title, style: Theme.of(context).textTheme.labelLarge),
+            child: Text(tr(group.title), style: Theme.of(context).textTheme.labelLarge),
           ),
           Wrap(
             spacing: 8,
@@ -476,7 +477,7 @@ class StampPalette extends StatelessWidget {
             children: [
               for (final stamp in group.stamps)
                 Tooltip(
-                  message: stamp.label,
+                  message: tr(stamp.label),
                   child: InkWell(
                     onTap: () => onSelected(stamp.id),
                     borderRadius: BorderRadius.circular(8),

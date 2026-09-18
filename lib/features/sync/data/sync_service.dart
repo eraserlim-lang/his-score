@@ -13,6 +13,7 @@ import '../../importer/data/score_importer.dart';
 import '../../viewer/domain/turn_input.dart';
 import '../../viewer/domain/viewer_controller.dart';
 import 'sync_protocol.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 기기 간 페이지 넘김 동기화와 리모컨.
 ///
@@ -102,7 +103,7 @@ class SyncService extends ChangeNotifier {
           await _startClient();
       }
     } on Object catch (e) {
-      _status = '시작 실패: $e';
+      _status = tr('시작 실패: {0}', [e]);
       notifyListeners();
     }
   }
@@ -112,7 +113,7 @@ class SyncService extends ChangeNotifier {
   Future<void> _startLead() async {
     _server = await ServerSocket.bind(InternetAddress.anyIPv4, 0);
     _server!.listen(_onClient);
-    _status = '연결 대기 (포트 ${_server!.port})';
+    _status = tr('연결 대기 (포트 {0})', [_server!.port]);
 
     _positionSub = hub.positions.listen(_broadcastPosition);
 
@@ -144,7 +145,7 @@ class SyncService extends ChangeNotifier {
 
   void _onClient(Socket socket) {
     _clients.add(socket);
-    _status = '${_clients.length}대 연결됨';
+    _status = tr('{0}대 연결됨', [_clients.length]);
     notifyListeners();
 
     final reader = FrameReader(socket)..start();
@@ -152,7 +153,7 @@ class SyncService extends ChangeNotifier {
       (msg) => _onLeadMessage(socket, msg),
       onDone: () {
         _clients.remove(socket);
-        _status = _clients.isEmpty ? '연결 대기' : '${_clients.length}대 연결됨';
+        _status = _clients.isEmpty ? tr('연결 대기') : tr('{0}대 연결됨', [_clients.length]);
         notifyListeners();
       },
       onError: (_) => socket.destroy(),
@@ -217,7 +218,7 @@ class SyncService extends ChangeNotifier {
   // ------------------------------------------------------------ 팔로워 / 리모컨
 
   Future<void> _startClient() async {
-    _status = '리드 기기를 찾는 중…';
+    _status = tr('리드 기기를 찾는 중…');
     _listener = await RawDatagramSocket.bind(InternetAddress.anyIPv4, discoveryPort, reuseAddress: true, reusePort: true);
     try {
       _listener!.joinMulticast(InternetAddress(multicastAddress));
@@ -252,7 +253,7 @@ class SyncService extends ChangeNotifier {
     _reconnect?.cancel();
     await _link?.close();
     _connectedTo = peer;
-    _status = '${peer.name} 에 연결 중…';
+    _status = tr('{0} 에 연결 중…', [peer.name]);
     notifyListeners();
     try {
       final socket = await Socket.connect(peer.host, peer.port, timeout: const Duration(seconds: 5));
@@ -264,9 +265,9 @@ class SyncService extends ChangeNotifier {
         onDone: _onDisconnected,
         onError: (_) => _onDisconnected(),
       );
-      _status = '${peer.name} 에 연결됨';
+      _status = tr('{0} 에 연결됨', [peer.name]);
     } on Object catch (e) {
-      _status = '연결 실패: $e';
+      _status = tr('연결 실패: {0}', [e]);
       _scheduleReconnect();
     }
     notifyListeners();
@@ -275,7 +276,7 @@ class SyncService extends ChangeNotifier {
   void _onDisconnected() {
     _link = null;
     _reader = null;
-    _status = '연결이 끊겼습니다. 다시 붙는 중…';
+    _status = tr('연결이 끊겼습니다. 다시 붙는 중…');
     notifyListeners();
     _scheduleReconnect();
   }
@@ -300,7 +301,7 @@ class SyncService extends ChangeNotifier {
           setlistId: msg['setlistId'] as String?,
         );
         if (await scoreDao.findById(scoreId) == null) {
-          _status = '"${position.title}" 을 리드에서 받는 중…';
+          _status = tr('"{0}" 을 리드에서 받는 중…', [position.title]);
           notifyListeners();
           final link = _link;
           if (link != null) sendJson(link, {'type': SyncMsg.needFile, 'scoreId': scoreId});
@@ -333,12 +334,12 @@ class SyncService extends ChangeNotifier {
         composer: msg['composer'] as String?,
         deleteSource: true,
       );
-      _status = '"${msg['title']}" 을 받았습니다';
+      _status = tr('"{0}" 을 받았습니다', [msg['title']]);
       final pending = _pendingPosition;
       _pendingPosition = null;
       if (pending != null) hub.applyRemotePosition(pending);
     } on Object catch (e) {
-      _status = '파일을 받지 못했습니다: $e';
+      _status = tr('파일을 받지 못했습니다: {0}', [e]);
     }
     notifyListeners();
   }

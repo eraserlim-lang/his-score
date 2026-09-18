@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../viewer/data/score_session.dart';
 import '../data/backup_service.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 설정 화면의 백업/복원 항목.
 class BackupTiles extends ConsumerWidget {
@@ -18,14 +19,14 @@ class BackupTiles extends ConsumerWidget {
       children: [
         ListTile(
           leading: const Icon(Icons.backup_outlined),
-          title: const Text('전체 백업'),
-          subtitle: const Text('악보, 필기, 태그, 세트리스트, 녹음을 한 파일로'),
+          title: Text(tr('전체 백업')),
+          subtitle: Text(tr('악보, 필기, 태그, 세트리스트, 녹음을 한 파일로')),
           onTap: () => _backup(context, ref),
         ),
         ListTile(
           leading: const Icon(Icons.restore_outlined),
-          title: const Text('백업에서 복원'),
-          subtitle: const Text('지금 있는 것을 모두 지우고 백업으로 되돌립니다'),
+          title: Text(tr('백업에서 복원')),
+          subtitle: Text(tr('지금 있는 것을 모두 지우고 백업으로 되돌립니다')),
           onTap: () => _restore(context, ref),
         ),
       ],
@@ -35,7 +36,7 @@ class BackupTiles extends ConsumerWidget {
   Future<void> _backup(BuildContext context, WidgetRef ref) async {
     final service = await ref.read(backupServiceProvider.future);
     if (!context.mounted) return;
-    final stage = ValueNotifier<String>('준비 중');
+    final stage = ValueNotifier<String>(tr('준비 중'));
     final dialog = showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -54,7 +55,7 @@ class BackupTiles extends ConsumerWidget {
       Navigator.of(context).pop();
       await dialog;
       if (!context.mounted) return;
-      final name = 'HIScore-백업-${_stamp()}.zip';
+      final name = tr('HIScore-백업-{0}.zip', [_stamp()]);
       final choice = await showModalBottomSheet<String>(
         context: context,
         builder: (context) => SafeArea(
@@ -63,13 +64,13 @@ class BackupTiles extends ConsumerWidget {
             children: [
               ListTile(
                 leading: const Icon(Icons.save_alt),
-                title: const Text('파일로 저장'),
+                title: Text(tr('파일로 저장')),
                 subtitle: Text('${(bytes.length / 1024 / 1024).toStringAsFixed(1)} MB'),
                 onTap: () => Navigator.pop(context, 'save'),
               ),
               ListTile(
                 leading: const Icon(Icons.share_outlined),
-                title: const Text('공유 / 다른 기기로 보내기'),
+                title: Text(tr('공유 / 다른 기기로 보내기')),
                 onTap: () => Navigator.pop(context, 'share'),
               ),
             ],
@@ -77,7 +78,7 @@ class BackupTiles extends ConsumerWidget {
         ),
       );
       if (choice == 'save') {
-        await FilePicker.saveFile(fileName: name, bytes: bytes, mimeType: 'application/zip', dialogTitle: '백업 저장');
+        await FilePicker.saveFile(fileName: name, bytes: bytes, mimeType: 'application/zip', dialogTitle: tr('백업 저장'));
       } else if (choice == 'share') {
         await SharePlus.instance.share(
           ShareParams(files: [XFile.fromData(bytes, name: name, mimeType: 'application/zip')], fileNameOverrides: [name]),
@@ -86,7 +87,7 @@ class BackupTiles extends ConsumerWidget {
     } on Object catch (e) {
       if (context.mounted) {
         Navigator.of(context).maybePop();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('백업 실패: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('백업 실패: {0}', [e]))));
       }
     }
   }
@@ -103,7 +104,7 @@ class BackupTiles extends ConsumerWidget {
       summary = await service.inspect(bytes);
     } on Object catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('백업 파일을 읽을 수 없습니다: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('백업 파일을 읽을 수 없습니다: {0}', [e]))));
       }
       return;
     }
@@ -112,15 +113,13 @@ class BackupTiles extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('복원할까요?'),
+        title: Text(tr('복원할까요?')),
         content: Text(
-          '백업 시각: ${summary.createdAt?.toLocal().toString().substring(0, 16) ?? '알 수 없음'}\n'
-          '악보 ${summary.scores}곡, 세트리스트 ${summary.setlists}개, 필기 ${summary.strokes}획, 파일 ${summary.files}개\n\n'
-          '지금 앱에 있는 모든 것이 지워지고 이 백업으로 바뀝니다.',
+          tr('백업 시각: {0}\n악보 {1}곡, 세트리스트 {2}개, 필기 {3}획, 파일 {4}개\n\n지금 앱에 있는 모든 것이 지워지고 이 백업으로 바뀝니다.', [summary.createdAt?.toLocal().toString().substring(0, 16) ?? '알 수 없음', summary.scores, summary.setlists, summary.strokes, summary.files]),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('복원')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('취소'))),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(tr('복원'))),
         ],
       ),
     );
@@ -131,11 +130,11 @@ class BackupTiles extends ConsumerWidget {
       // 열려 있던 세션 캐시를 전부 버린다.
       ref.invalidate(scoreSessionProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('복원했습니다')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('복원했습니다'))));
       }
     } on Object catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('복원 실패: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('복원 실패: {0}', [e]))));
       }
     }
   }

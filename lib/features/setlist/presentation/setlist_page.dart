@@ -6,6 +6,7 @@ import '../../../core/db/score_dao.dart';
 import '../../../core/db/setlist_dao.dart';
 import '../../library/presentation/tag_manager_sheet.dart';
 import 'setlist_share_actions.dart';
+import '../../../core/i18n/tr.dart';
 
 /// 세트리스트 목록.
 class SetlistPage extends ConsumerWidget {
@@ -17,19 +18,19 @@ class SetlistPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('세트리스트'),
+        title: Text(tr('세트리스트')),
         actions: [
           IconButton(
             onPressed: () => importSetlistFile(context, ref),
             icon: const Icon(Icons.file_open_outlined),
-            tooltip: '세트리스트 파일 가져오기',
+            tooltip: tr('세트리스트 파일 가져오기'),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => createSetlist(context, ref),
         icon: const Icon(Icons.add),
-        label: const Text('새 세트리스트'),
+        label: Text(tr('새 세트리스트')),
       ),
       body: setlists.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -46,10 +47,10 @@ class SetlistPage extends ConsumerWidget {
                     color: Theme.of(context).colorScheme.outline,
                   ),
                   const SizedBox(height: 12),
-                  Text('세트리스트가 없습니다',
+                  Text(tr('세트리스트가 없습니다'),
                       style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 4),
-                  Text('공연이나 연습 순서대로 곡을 묶어 두세요',
+                  Text(tr('공연이나 연습 순서대로 곡을 묶어 두세요'),
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
@@ -75,7 +76,7 @@ class SetlistPage extends ConsumerWidget {
                 child: ListTile(
                   leading: const Icon(Icons.queue_music),
                   title: Text(entry.setlist.name),
-                  subtitle: Text('${entry.itemCount}곡'),
+                  subtitle: Text(tr('{0}곡', [entry.itemCount])),
                   trailing: PopupMenuButton<String>(
                     onSelected: (v) async {
                       final dao = ref.read(setlistDaoProvider);
@@ -96,11 +97,11 @@ class SetlistPage extends ConsumerWidget {
                       PopupMenuItem(
                         value: 'play',
                         enabled: entry.itemCount > 0,
-                        child: const Text('연주하기'),
+                        child: Text(tr('연주하기')),
                       ),
-                      const PopupMenuItem(value: 'share', child: Text('공유')),
-                      const PopupMenuItem(value: 'duplicate', child: Text('복제')),
-                      const PopupMenuItem(value: 'delete', child: Text('지우기')),
+                      PopupMenuItem(value: 'share', child: Text(tr('공유'))),
+                      PopupMenuItem(value: 'duplicate', child: Text(tr('복제'))),
+                      PopupMenuItem(value: 'delete', child: Text(tr('지우기'))),
                     ],
                   ),
                   onTap: () => context.go('/setlists/${entry.setlist.id}'),
@@ -117,16 +118,16 @@ class SetlistPage extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('"$name" 을 지울까요?'),
-        content: const Text('곡 파일은 그대로 남습니다.'),
+        title: Text(tr('"{0}" 을 지울까요?', [name])),
+        content: Text(tr('곡 파일은 그대로 남습니다.')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: Text(tr('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('지우기'),
+            child: Text(tr('지우기')),
           ),
         ],
       ),
@@ -141,21 +142,21 @@ Future<String?> createSetlist(BuildContext context, WidgetRef ref) async {
   final name = await showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('새 세트리스트'),
+      title: Text(tr('새 세트리스트')),
       content: TextField(
         controller: controller,
         autofocus: true,
-        decoration: const InputDecoration(labelText: '이름'),
+        decoration: InputDecoration(labelText: tr('이름')),
         onSubmitted: (v) => Navigator.pop(context, v),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('취소'),
+          child: Text(tr('취소')),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, controller.text),
-          child: const Text('다음'),
+          child: Text(tr('다음')),
         ),
       ],
     ),
@@ -170,7 +171,7 @@ Future<String?> createSetlist(BuildContext context, WidgetRef ref) async {
 
   final chosen = await showScoreCheckDialog(
     context,
-    title: '"${name.trim()}" 에 넣을 곡',
+    title: tr('"{0}" 에 넣을 곡', [name.trim()]),
     scores: scores,
   );
   if (chosen == null) return null;
