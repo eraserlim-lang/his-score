@@ -1,0 +1,747 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../../../core/db/database.dart';
+import '../domain/keyboard.dart';
+import '../domain/metronome.dart';
+import '../domain/music_player.dart';
+import '../domain/pitch.dart';
+import '../domain/recorder.dart';
+import '../domain/tuner.dart';
+
+/// 음악 도구 종류.
+enum MusicTool {
+  metronome('메트로놈', Icons.av_timer),
+  keyboard('건반', Icons.piano),
+  tuner('튜너', Icons.graphic_eq),
+  recorder('녹음기', Icons.mic_none),
+  player('플레이어', Icons.music_note);
+
+  const MusicTool(this.label, this.icon);
+  final String label;
+  final IconData icon;
+}
+
+/// 도구 하나를 바닥 시트로 연다. 시트를 닫아도 메트로놈과 재생은 계속된다.
+Future<void> showMusicTool(BuildContext context, MusicTool tool, {String? scoreId}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (context) => Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: switch (tool) {
+        MusicTool.metronome => const MetronomePanel(),
+        MusicTool.keyboard => const KeyboardPanel(),
+        MusicTool.tuner => const TunerPanel(),
+        MusicTool.recorder => RecorderPanel(scoreId: scoreId),
+        MusicTool.player => const PlayerPanel(),
+      },
+    ),
+  );
+}
+
+/// 뷰어 왼쪽에 세로로 붙는 도구 버튼들.
+class ToolRail extends ConsumerWidget {
+  const ToolRail({super.key, this.scoreId});
+
+  final String? scoreId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final metronome = ref.watch(metronomeProvider);
+    final player = ref.watch(musicPlayerProvider);
+    final recorder = ref.watch(recorderProvider);
+    final scheme = Theme.of(context).colorScheme;
+
+    bool active(MusicTool t) => switch (t) {
+          MusicTool.metronome => metronome.running,
+          MusicTool.player => player.hasTrack,
+          MusicTool.recorder => recorder.recording,
+          _ => false,
+        };
+
+    return Material(
+      color: scheme.surface.withValues(alpha: 0.92),
+      borderRadius: const BorderRadius.horizontal(right: Radius.circular(14)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final t in MusicTool.values)
+              IconButton(
+                tooltip: t.label,
+                isSelected: active(t),
+                icon: Icon(t.icon),
+                onPressed: () => showMusicTool(context, t, scoreId: scoreId),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- 메트로놈
+
+class MetronomePanel extends ConsumerWidget {
+  const MetronomePanel({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final m = ref.watch(metronomeProvider);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 150,
+          child: CustomPaint(
+            size: const Size(double.infinity, 150),
+            painter: _PendulumPainter(
+              position: m.pendulum,
+              beat: m.beat,
+              beats: m.beatsPerBar,
+              running: m.running,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton.filledTonal(onPressed: () => m.nudge(-1), icon: const Icon(Icons.remove)),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => _askBpm(context, m),
+              child: Column(
+                children: [
+                  Text('${m.bpm}', style: Theme.of(context).textTheme.displaySmall),
+                  Text(m.tempoName, style: Theme.of(context).textTheme.labelMedium),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(onPressed: () => m.nudge(1), icon: const Icon(Icons.add)),
+          ],
+        ),
+        Slider(
+          value: m.bpm.toDouble(),
+          min: MetronomeController.minBpm.toDouble(),
+          max: MetronomeController.maxBpm.toDouble(),
+          onChanged: (v) => m.setBpm(v.round()),
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const Text('박자'),
+            for (final n in [2, 3, 4, 5, 6, 7])
+              ChoiceChip(
+                label: Text('$n'),
+                selected: m.beatsPerBar == n,
+                onSelected: (_) => m.setBeatsPerBar(n),
+              ),
+            const SizedBox(width: 12),
+            const Text('분할'),
+            for (final (n, l) in [(1, '♩'), (2, '♫'), (3, '3'), (4, '4')])
+              ChoiceChip(
+                label: Text(l),
+                selected: m.subdivision == n,
+                onSelected: (_) => m.setSubdivision(n),
+              ),
+          ],
+        ),
+        Row(
+          children: [
+            FilterChip(
+              label: const Text('첫 박 강세'),
+              selected: m.accentFirst,
+              onSelected: m.setAccentFirst,
+            ),
+            const SizedBox(width: 8),
+            FilterChip(
+              label: const Text('무음'),
+              avatar: Icon(m.silent ? Icons.volume_off : Icons.volume_up, size: 16),
+              selected: m.silent,
+              onSelected: m.setSilent,
+            ),
+            const Spacer(),
+            OutlinedButton(onPressed: m.tap, child: const Text('TAP')),
+          ],
+        ),
+        Row(
+          children: [
+            const Icon(Icons.volume_down, size: 18),
+            Expanded(child: Slider(value: m.volume, onChanged: m.setVolume)),
+          ],
+        ),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: m.toggle,
+            icon: Icon(m.running ? Icons.stop : Icons.play_arrow),
+            label: Text(m.running ? '정지' : '시작'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _askBpm(BuildContext context, MetronomeController m) async {
+    final c = TextEditingController(text: '${m.bpm}');
+    final v = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('템포'),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          onSubmitted: (v) => Navigator.pop(context, v),
+        ),
+        actions: [
+          FilledButton(onPressed: () => Navigator.pop(context, c.text), child: const Text('확인')),
+        ],
+      ),
+    );
+    final n = int.tryParse(v ?? '');
+    if (n != null) m.setBpm(n);
+  }
+}
+
+class _PendulumPainter extends CustomPainter {
+  _PendulumPainter({
+    required this.position,
+    required this.beat,
+    required this.beats,
+    required this.running,
+    required this.color,
+  });
+
+  final double position;
+  final int beat;
+  final int beats;
+  final bool running;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final pivot = Offset(size.width / 2, size.height - 16);
+    final len = size.height - 40;
+    final angle = position * 0.5;
+    final tip = pivot + Offset(len * -angle.clamp(-1, 1), -len * 0.95);
+    final paint = Paint()
+      ..color = color.withValues(alpha: running ? 1 : 0.35)
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(pivot, tip, paint);
+    canvas.drawCircle(tip, 10, paint..style = PaintingStyle.fill);
+
+    // 박 불빛
+    final dotW = 18.0;
+    final totalW = beats * dotW + (beats - 1) * 8;
+    var x = (size.width - totalW) / 2 + dotW / 2;
+    for (var i = 0; i < beats; i++) {
+      final on = running && i == beat;
+      canvas.drawCircle(
+        Offset(x, 12),
+        on ? 8 : 5,
+        Paint()..color = on ? color : color.withValues(alpha: 0.25),
+      );
+      x += dotW + 8;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PendulumPainter old) =>
+      old.position != position || old.beat != beat || old.running != running || old.beats != beats;
+}
+
+// ---------------------------------------------------------------- 건반
+
+class KeyboardPanel extends ConsumerWidget {
+  const KeyboardPanel({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final k = ref.watch(keyboardProvider);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            IconButton(onPressed: () => k.shiftOctave(-1), icon: const Icon(Icons.chevron_left), tooltip: '한 옥타브 아래'),
+            Text(PitchReading.fromFrequency(PitchReading.frequencyOf(k.lowest)).label),
+            IconButton(onPressed: () => k.shiftOctave(1), icon: const Icon(Icons.chevron_right), tooltip: '한 옥타브 위'),
+            const Spacer(),
+            const Text('크기'),
+            for (final n in [1, 2, 3])
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: ChoiceChip(label: Text('$n옥타브'), selected: k.octaves == n, onSelected: (_) => k.setOctaves(n)),
+              ),
+          ],
+        ),
+        SizedBox(
+          height: 170,
+          child: PianoKeyboard(controller: k),
+        ),
+      ],
+    );
+  }
+}
+
+/// 피아노 건반. 흰 건반을 깔고 검은 건반을 위에 얹는다.
+class PianoKeyboard extends StatelessWidget {
+  const PianoKeyboard({super.key, required this.controller});
+
+  final KeyboardController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final lowest = controller.lowest;
+    final count = controller.octaves * 12 + 1;
+    final whites = <int>[];
+    for (var m = lowest; m < lowest + count; m++) {
+      if (!_isBlack(m)) whites.add(m);
+    }
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        final whiteW = c.maxWidth / whites.length;
+        final blackW = whiteW * 0.62;
+        final blackH = c.maxHeight * 0.6;
+
+        return Stack(
+          children: [
+            Row(
+              children: [
+                for (final m in whites)
+                  Expanded(
+                    child: _Key(
+                      midi: m,
+                      black: false,
+                      pressed: controller.pressed.contains(m),
+                      label: m % 12 == 0 ? 'C${m ~/ 12 - 1}' : null,
+                      onDown: () => controller.press(m),
+                      onUp: () => controller.release(m),
+                    ),
+                  ),
+              ],
+            ),
+            for (var m = lowest; m < lowest + count; m++)
+              if (_isBlack(m))
+                Positioned(
+                  left: _blackLeft(m, lowest, whiteW) - blackW / 2,
+                  top: 0,
+                  width: blackW,
+                  height: blackH,
+                  child: _Key(
+                    midi: m,
+                    black: true,
+                    pressed: controller.pressed.contains(m),
+                    onDown: () => controller.press(m),
+                    onUp: () => controller.release(m),
+                  ),
+                ),
+          ],
+        );
+      },
+    );
+  }
+
+  static bool _isBlack(int midi) => const {1, 3, 6, 8, 10}.contains(midi % 12);
+
+  /// 검은 건반의 중심 x. 같은 옥타브의 흰 건반 개수를 세어 자리를 잡는다.
+  double _blackLeft(int midi, int lowest, double whiteW) {
+    var whitesBefore = 0;
+    for (var m = lowest; m < midi; m++) {
+      if (!_isBlack(m)) whitesBefore++;
+    }
+    // 바로 앞 흰 건반의 오른쪽 경계. 실제 피아노처럼 C♯/F♯는 살짝 왼쪽, D♯/A♯는 살짝 오른쪽.
+    return whitesBefore * whiteW + _tweak(midi) * whiteW;
+  }
+
+  double _tweak(int midi) => switch (midi % 12) {
+        1 || 6 => -0.08,
+        3 || 10 => 0.08,
+        _ => 0,
+      };
+}
+
+class _Key extends StatelessWidget {
+  const _Key({
+    required this.midi,
+    required this.black,
+    required this.pressed,
+    required this.onDown,
+    required this.onUp,
+    this.label,
+  });
+
+  final int midi;
+  final bool black;
+  final bool pressed;
+  final VoidCallback onDown;
+  final VoidCallback onUp;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = black ? const Color(0xFF222222) : Colors.white;
+    final down = black ? const Color(0xFF555555) : const Color(0xFFDDE7F5);
+    return Listener(
+      onPointerDown: (_) => onDown(),
+      onPointerUp: (_) => onUp(),
+      onPointerCancel: (_) => onUp(),
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: black ? 0 : 1),
+        decoration: BoxDecoration(
+          color: pressed ? down : base,
+          border: Border.all(color: Colors.black54, width: 0.8),
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(4)),
+        ),
+        alignment: Alignment.bottomCenter,
+        padding: const EdgeInsets.only(bottom: 6),
+        child: label == null ? null : Text(label!, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- 튜너
+
+class TunerPanel extends ConsumerStatefulWidget {
+  const TunerPanel({super.key});
+
+  @override
+  ConsumerState<TunerPanel> createState() => _TunerPanelState();
+}
+
+class _TunerPanelState extends ConsumerState<TunerPanel> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => ref.read(tunerProvider).start());
+  }
+
+  @override
+  void dispose() {
+    // 시트를 닫으면 마이크를 놓는다. 기준음은 남겨 둔다.
+    ref.read(tunerProvider).stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ref.watch(tunerProvider);
+    final r = t.reading;
+    final displayed = r == null ? null : PitchReading.fromFrequency(r.frequency, a4: t.a4);
+    final transposed = displayed == null
+        ? null
+        : PitchReading(frequency: displayed.frequency, midi: displayed.midi + t.transpose, cents: displayed.cents);
+    final cents = transposed?.cents ?? 0;
+    final inTune = transposed != null && cents.abs() < 5;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (t.error != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(t.error!, style: TextStyle(color: scheme.error)),
+          ),
+        SizedBox(
+          height: 120,
+          child: CustomPaint(
+            size: const Size(double.infinity, 120),
+            painter: _TunerGaugePainter(cents: transposed == null ? null : cents, color: inTune ? Colors.green : scheme.primary),
+          ),
+        ),
+        Text(
+          transposed?.label ?? '—',
+          style: Theme.of(context).textTheme.displayMedium?.copyWith(color: inTune ? Colors.green : null),
+        ),
+        Text(
+          transposed == null ? '소리를 내 보세요' : '${transposed.frequency.toStringAsFixed(1)} Hz · ${cents >= 0 ? '+' : ''}${cents.toStringAsFixed(0)}¢',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Text('A4 = ${t.a4.round()} Hz'),
+            Expanded(child: Slider(value: t.a4, min: 415, max: 466, divisions: 51, onChanged: t.setA4)),
+          ],
+        ),
+        Row(
+          children: [
+            const Text('이조'),
+            const SizedBox(width: 8),
+            for (final (semi, name) in [(0, 'C'), (-2, 'B♭'), (-9, 'E♭'), (-7, 'F')])
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: ChoiceChip(label: Text(name), selected: t.transpose == semi, onSelected: (_) => t.setTranspose(semi)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('기준음', style: Theme.of(context).textTheme.labelLarge),
+        ),
+        Wrap(
+          spacing: 6,
+          children: [
+            for (final midi in [57, 60, 62, 64, 65, 67, 69, 71, 72])
+              FilterChip(
+                label: Text(PitchReading.fromFrequency(PitchReading.frequencyOf(midi)).label),
+                selected: t.pipeMidi == midi,
+                onSelected: (_) => t.togglePipe(midi),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TunerGaugePainter extends CustomPainter {
+  _TunerGaugePainter({required this.cents, required this.color});
+  final double? cents;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final baseline = size.height - 20;
+    final half = size.width * 0.42;
+    final axis = Paint()
+      ..color = Colors.grey
+      ..strokeWidth = 2;
+    canvas.drawLine(Offset(cx - half, baseline), Offset(cx + half, baseline), axis);
+    for (var c = -50; c <= 50; c += 10) {
+      final x = cx + c / 50 * half;
+      final h = c == 0 ? 18.0 : (c % 25 == 0 ? 12.0 : 7.0);
+      canvas.drawLine(Offset(x, baseline), Offset(x, baseline - h), axis);
+    }
+    final v = cents;
+    if (v == null) return;
+    final x = cx + (v.clamp(-50, 50) / 50) * half;
+    final needle = Paint()
+      ..color = color
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(x, baseline + 4), Offset(x, 10), needle);
+  }
+
+  @override
+  bool shouldRepaint(_TunerGaugePainter old) => old.cents != cents || old.color != color;
+}
+
+// ---------------------------------------------------------------- 녹음기
+
+class RecorderPanel extends ConsumerWidget {
+  const RecorderPanel({super.key, this.scoreId});
+
+  final String? scoreId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final r = ref.watch(recorderProvider)..contextScoreId = scoreId;
+    final list = ref.watch(recordingsProvider).value ?? const <Recording>[];
+    final scheme = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.6,
+      child: Column(
+        children: [
+          if (r.error != null) Text(r.error!, style: TextStyle(color: scheme.error)),
+          Row(
+            children: [
+              FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: r.recording ? scheme.error : null),
+                onPressed: r.recording ? r.stop : r.start,
+                icon: Icon(r.recording ? Icons.stop : Icons.fiber_manual_record),
+                label: Text(r.recording ? '정지 ${_fmt(r.elapsed)}' : '녹음'),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: LinearProgressIndicator(
+                  value: r.recording ? r.amplitude : 0,
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: list.isEmpty
+                ? const Center(child: Text('녹음이 없습니다'))
+                : ListView.builder(
+                    itemCount: list.length,
+                    itemBuilder: (context, i) {
+                      final rec = list[i];
+                      final playing = r.playingId == rec.id;
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListTile(
+                            leading: IconButton.filledTonal(
+                              onPressed: () => r.play(rec),
+                              icon: Icon(playing && !r.isPaused ? Icons.pause : Icons.play_arrow),
+                            ),
+                            title: Text(rec.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: Text(_fmt(Duration(milliseconds: rec.durationMs))),
+                            trailing: PopupMenuButton<String>(
+                              onSelected: (v) async {
+                                switch (v) {
+                                  case 'share':
+                                    await SharePlus.instance.share(
+                                      ShareParams(files: [XFile(r.fileOf(rec).path)], subject: rec.title),
+                                    );
+                                  case 'rename':
+                                    final name = await _ask(context, rec.title);
+                                    if (name != null) await r.rename(rec, name);
+                                  case 'delete':
+                                    await r.delete(rec);
+                                }
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem(value: 'share', child: Text('공유 / 내보내기')),
+                                PopupMenuItem(value: 'rename', child: Text('이름 바꾸기')),
+                                PopupMenuItem(value: 'delete', child: Text('지우기')),
+                              ],
+                            ),
+                          ),
+                          if (playing)
+                            Slider(
+                              value: r.playPosition.inMilliseconds
+                                  .toDouble()
+                                  .clamp(0.0, r.playLength.inMilliseconds.toDouble().clamp(1.0, double.infinity)),
+                              max: r.playLength.inMilliseconds.toDouble().clamp(1.0, double.infinity),
+                              onChanged: (v) => r.seek(Duration(milliseconds: v.round())),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<String?> _ask(BuildContext context, String initial) async {
+    final c = TextEditingController(text: initial);
+    final v = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('이름'),
+        content: TextField(controller: c, autofocus: true),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
+          FilledButton(onPressed: () => Navigator.pop(context, c.text.trim()), child: const Text('확인')),
+        ],
+      ),
+    );
+    return v == null || v.isEmpty ? null : v;
+  }
+
+  static String _fmt(Duration d) =>
+      '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+}
+
+// ---------------------------------------------------------------- 플레이어
+
+class PlayerPanel extends ConsumerWidget {
+  const PlayerPanel({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = ref.watch(musicPlayerProvider);
+    final length = p.length.inMilliseconds.toDouble();
+
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.6,
+      child: Column(
+        children: [
+          if (p.current != null) ...[
+            Text(p.current!.title, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Slider(
+              value: p.position.inMilliseconds.toDouble().clamp(0, length < 1 ? 1 : length),
+              max: length < 1 ? 1 : length,
+              onChanged: (v) => p.seek(Duration(milliseconds: v.round())),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(onPressed: () => p.seek(p.position - const Duration(seconds: 10)), icon: const Icon(Icons.replay_10)),
+                IconButton.filled(onPressed: p.togglePause, icon: Icon(p.isPlaying ? Icons.pause : Icons.play_arrow)),
+                IconButton(onPressed: () => p.seek(p.position + const Duration(seconds: 10)), icon: const Icon(Icons.forward_10)),
+                IconButton(onPressed: p.stop, icon: const Icon(Icons.stop)),
+                IconButton(
+                  onPressed: () => p.setLoop(!p.loop),
+                  isSelected: p.loop,
+                  icon: const Icon(Icons.repeat),
+                  tooltip: '반복',
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                const Icon(Icons.volume_down, size: 18),
+                Expanded(child: Slider(value: p.volume, onChanged: p.setVolume)),
+              ],
+            ),
+            const Divider(),
+          ],
+          Row(
+            children: [
+              Text('음원', style: Theme.of(context).textTheme.labelLarge),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () async {
+                  final n = await p.pickAndAdd();
+                  if (context.mounted && n > 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$n개를 추가했습니다')));
+                  }
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('음원 추가'),
+              ),
+            ],
+          ),
+          Expanded(
+            child: p.tracks.isEmpty
+                ? const Center(child: Text('MP3, WAV, FLAC, OGG 파일을 추가하세요'))
+                : ListView.builder(
+                    itemCount: p.tracks.length,
+                    itemBuilder: (context, i) {
+                      final t = p.tracks[i];
+                      final cur = p.current?.path == t.path;
+                      return ListTile(
+                        leading: Icon(cur ? Icons.equalizer : Icons.audiotrack_outlined),
+                        title: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        selected: cur,
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => p.remove(t),
+                        ),
+                        onTap: () => p.play(t),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

@@ -11,6 +11,7 @@ import '../../annotation/data/page_ink_store.dart';
 import '../../annotation/domain/annotation_tool_state.dart';
 import '../../annotation/presentation/annotation_toolbar.dart';
 import '../../annotation/presentation/ink_layer.dart';
+import '../../tools/presentation/tools_panel.dart';
 import '../../../core/db/database.dart';
 import '../data/page_tools_dao.dart';
 import '../data/score_session.dart';
@@ -406,6 +407,14 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                       child: _TopBar(
                         title: _titleFor(state),
                         state: state,
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: ToolRail(scoreId: _currentPage.scoreId),
                       ),
                     ),
                     Positioned(
