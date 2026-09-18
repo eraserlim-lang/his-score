@@ -99,8 +99,10 @@ class ScoreImporter {
     String? artist,
     String? composer,
     bool deleteSource = false,
+    String? id,
   }) async {
-    final id = _uuid.v4();
+    // 기기 동기화로 받은 곡은 리드와 같은 id 를 써야 위치를 맞출 수 있다.
+    id ??= _uuid.v4();
     final fileName = p.basename(source.path);
     final target = File(p.join(_paths.scoresDir.path, '$id.pdf'));
 

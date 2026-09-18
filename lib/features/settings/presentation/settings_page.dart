@@ -1,9 +1,13 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/settings_dao.dart';
 import '../../importer/data/watch_folder_service.dart';
+import '../../sync/presentation/sync_sheet.dart';
+import '../../viewer/domain/turn_input.dart';
+import '../../viewer/domain/viewer_controller.dart';
 
 /// 설정.
 class SettingsPage extends ConsumerWidget {
@@ -15,6 +19,20 @@ class SettingsPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('설정')),
       body: ListView(
         children: [
+          const _SectionHeader('페이지 넘김'),
+          const _PedalTile(),
+          ListTile(
+            leading: const Icon(Icons.devices_other_outlined),
+            title: const Text('기기 동기화'),
+            subtitle: const Text('리드 / 팔로우 역할과 연결 상태'),
+            onTap: () => showSyncSheet(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings_remote),
+            title: const Text('리모컨 모드'),
+            subtitle: const Text('이 기기로 다른 기기의 페이지를 넘깁니다'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RemotePage())),
+          ),
           const _SectionHeader('가져오기'),
           if (WatchFolderService.supported) const _WatchFolderTile(),
           const _SectionHeader('클라우드 연결'),
@@ -135,5 +153,66 @@ class _TextSettingTile extends ConsumerWidget {
         ref.invalidate(settingProvider(settingKey));
       },
     );
+  }
+}
+
+/// 블루투스 페달 학습. 페달을 밟으면 어떤 키가 오는지 잡아 매핑에 넣는다.
+class _PedalTile extends ConsumerWidget {
+  const _PedalTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final raw = ref.watch(settingProvider(SettingKeys.pedalNext)).value;
+    final mapping = PedalMapping.decode(raw);
+    return ListTile(
+      leading: const Icon(Icons.keyboard_alt_outlined),
+      title: const Text('페달 / 키보드 매핑'),
+      subtitle: Text('다음 ${mapping.next.length}개 키, 이전 ${mapping.previous.length}개 키'),
+      trailing: PopupMenuButton<String>(
+        onSelected: (v) async {
+          if (v == 'reset') {
+            await ref.read(settingsDaoProvider).set(SettingKeys.pedalNext, null);
+            return;
+          }
+          final cmd = v == 'next' ? TurnCommand.next : TurnCommand.previous;
+          final key = await _learn(context, cmd);
+          if (key == null) return;
+          final updated = cmd == TurnCommand.next
+              ? mapping.withLearned(nextKey: key.keyId)
+              : mapping.withLearned(previousKey: key.keyId);
+          await ref.read(settingsDaoProvider).set(SettingKeys.pedalNext, updated.encode());
+        },
+        itemBuilder: (context) => const [
+          PopupMenuItem(value: 'next', child: Text('"다음" 페달 학습')),
+          PopupMenuItem(value: 'previous', child: Text('"이전" 페달 학습')),
+          PopupMenuItem(value: 'reset', child: Text('기본값으로')),
+        ],
+      ),
+    );
+  }
+
+  Future<LogicalKeyboardKey?> _learn(BuildContext context, TurnCommand cmd) {
+    LogicalKeyboardKey? captured;
+    bool handler(KeyEvent e) {
+      if (e is KeyDownEvent) {
+        captured = e.logicalKey;
+        Navigator.of(context).pop();
+        return true;
+      }
+      return false;
+    }
+
+    HardwareKeyboard.instance.addHandler(handler);
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(cmd == TurnCommand.next ? '"다음" 페달을 밟으세요' : '"이전" 페달을 밟으세요'),
+        content: const Text('키보드 키를 눌러도 됩니다.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소'))],
+      ),
+    ).then((_) {
+      HardwareKeyboard.instance.removeHandler(handler);
+      return captured;
+    });
   }
 }

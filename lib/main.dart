@@ -7,6 +7,7 @@ import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/importer/data/open_in_handler.dart';
 import 'features/importer/data/watch_folder_service.dart';
+import 'features/sync/data/sync_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +27,7 @@ class HIScoreApp extends ConsumerWidget {
     // 앱이 떠 있는 동안 계속 살아 있어야 하는 것들.
     ref.watch(openInHandlerProvider);
     if (WatchFolderService.supported) ref.watch(watchFolderServiceProvider);
+    ref.watch(syncServiceProvider);
 
     return MaterialApp.router(
       title: 'HIScore',

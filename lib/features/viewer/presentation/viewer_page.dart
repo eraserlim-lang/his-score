@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,7 +14,11 @@ import '../../annotation/data/page_ink_store.dart';
 import '../../annotation/domain/annotation_tool_state.dart';
 import '../../annotation/presentation/annotation_toolbar.dart';
 import '../../annotation/presentation/ink_layer.dart';
+import '../../sync/presentation/sync_sheet.dart';
 import '../../tools/presentation/tools_panel.dart';
+import '../../../core/db/settings_dao.dart';
+import '../data/face_turn_service.dart';
+import '../domain/turn_input.dart';
 import '../../../core/db/database.dart';
 import '../data/page_tools_dao.dart';
 import '../data/score_session.dart';
@@ -68,6 +75,11 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   final _tools = AnnotationToolState();
   bool _chromeVisible = true;
 
+  late final TurnInputHub _hub;
+  StreamSubscription<TurnCommand>? _hubSub;
+  StreamSubscription<ViewerPosition>? _remoteSub;
+  PedalMapping _pedals = PedalMapping.defaults;
+
   /// 미리 굽기에 쓸 목표 폭. 화면이 만들어진 뒤에 정해진다.
   double _renderWidth = 1200;
 
@@ -92,14 +104,52 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
 
     _inkStore = InkStore(ref.read(annotationDaoProvider));
 
+    // 페달, 얼굴 제스처, 리모컨, 리드 기기가 보내는 명령을 받는다.
+    _hub = ref.read(turnInputHubProvider)..viewerOpen = true;
+    _hubSub = _hub.commands.listen(_controller.handle);
+    _remoteSub = _hub.remotePositions.listen(_applyRemotePosition);
+    HardwareKeyboard.instance.addHandler(_onKey);
+    ref.read(settingsDaoProvider).get(SettingKeys.pedalNext).then((raw) {
+      if (mounted) _pedals = PedalMapping.decode(raw);
+    });
+
     // 첫 화면에 보일 페이지 주변을 미리 굽는다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _handlePageChanged(_controller.state.pageIndex);
     });
   }
 
+  /// 키보드와 블루투스 페달. 글자를 입력하는 중에는 끼어들지 않는다.
+  bool _onKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus?.context?.widget is EditableText) return false;
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
+    final cmd = _pedals.commandFor(event.logicalKey);
+    if (cmd == null) return false;
+    _controller.handle(cmd);
+    return true;
+  }
+
+  /// 리드 기기가 보낸 위치로 이동한다. 같은 곡이 아니면 그 곡을 연다.
+  void _applyRemotePosition(ViewerPosition p) {
+    final index = widget.session.pageIndexOf(p.scoreId, p.sourcePage);
+    if (index >= 0) {
+      _controller.goToPage(index);
+      return;
+    }
+    if (widget.session.scores.any((s) => s.id == p.scoreId)) return;
+    // 다른 곡이다. 그 곡으로 화면을 바꾼다.
+    context.pushReplacement('/score/${p.scoreId}?page=${p.sourcePage - 1}');
+  }
+
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    _hubSub?.cancel();
+    _remoteSub?.cancel();
+    _hub.viewerOpen = false;
+    ref.read(faceTurnServiceProvider).stop();
     _controller.dispose();
     _tools.dispose();
     // 저장 큐를 비운 뒤 정리한다. 마지막 획이 사라지면 안 된다.
@@ -283,6 +333,15 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     if (pageIndex < 0 || pageIndex >= widget.session.pageCount) return;
 
     final page = widget.session.pages[pageIndex];
+    _hub.reportPosition(
+      ViewerPosition(
+        scoreId: page.scoreId,
+        sourcePage: page.sourcePageNumber,
+        pageIndex: pageIndex,
+        title: widget.session.scoreOf(page).title,
+        setlistId: widget.session.key.isSetlist ? widget.session.key.id : null,
+      ),
+    );
     if (!page.isBlank) {
       widget.session.cacheFor(page).prefetch(page.sourcePageNumber, _renderWidth);
     }
@@ -342,12 +401,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) _controller.setPerformanceMode(false);
           },
-          child: CallbackShortcuts(
-            bindings: {
-              for (final entry in _keyBindings.entries)
-                entry.key: () => _controller.handle(entry.value),
-            },
-            child: Focus(
+          child: Focus(
               autofocus: true,
               child: Stack(
                 children: [
@@ -433,6 +487,10 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                             controller: _controller,
                             isLandscape: isLandscape,
                             onPageMenu: _openPageMenu,
+                            onSync: () => showSyncSheet(context),
+                            faceGesture: FaceTurnService.supported
+                                ? ref.watch(faceTurnServiceProvider)
+                                : null,
                           ),
                         ],
                       ),
@@ -451,7 +509,6 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                 ],
               ),
             ),
-          ),
         );
       },
     );
@@ -501,19 +558,6 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     );
   }
 
-  /// 데스크톱 키보드와 블루투스 페달이 같은 키를 보낸다.
-  /// Phase 7 에서 페달 매핑을 설정으로 빼면 여기만 바꾸면 된다.
-  static const _keyBindings = <ShortcutActivator, TurnCommand>{
-    SingleActivator(LogicalKeyboardKey.arrowRight): TurnCommand.next,
-    SingleActivator(LogicalKeyboardKey.arrowDown): TurnCommand.next,
-    SingleActivator(LogicalKeyboardKey.space): TurnCommand.next,
-    SingleActivator(LogicalKeyboardKey.pageDown): TurnCommand.next,
-    SingleActivator(LogicalKeyboardKey.arrowLeft): TurnCommand.previous,
-    SingleActivator(LogicalKeyboardKey.arrowUp): TurnCommand.previous,
-    SingleActivator(LogicalKeyboardKey.pageUp): TurnCommand.previous,
-    SingleActivator(LogicalKeyboardKey.home): TurnCommand.first,
-    SingleActivator(LogicalKeyboardKey.end): TurnCommand.last,
-  };
 }
 
 enum _TapZone { firstPage, previous, next, center }

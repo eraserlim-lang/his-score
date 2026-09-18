@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/db/tables.dart';
+import '../../data/face_turn_service.dart';
 import '../../domain/viewer_controller.dart';
 
 /// 하단 도구 막대. 레이아웃 전환과 자동 스크롤을 담는다.
@@ -11,12 +12,18 @@ class ViewerToolbar extends StatelessWidget {
     required this.controller,
     required this.isLandscape,
     required this.onPageMenu,
+    required this.onSync,
+    this.faceGesture,
   });
 
   final ViewerState state;
   final ViewerController controller;
   final bool isLandscape;
   final ValueChanged<String> onPageMenu;
+  final VoidCallback onSync;
+
+  /// 얼굴 제스처 서비스. 지원하지 않는 플랫폼이면 null.
+  final FaceTurnService? faceGesture;
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +104,27 @@ class ViewerToolbar extends StatelessWidget {
                     ),
                   ],
                 ],
+              ),
+              if (faceGesture != null)
+                ListenableBuilder(
+                  listenable: faceGesture!,
+                  builder: (context, _) => IconButton(
+                    onPressed: () => faceGesture!.running ? faceGesture!.stop() : faceGesture!.start(),
+                    isSelected: faceGesture!.running,
+                    tooltip: faceGesture!.running
+                        ? (faceGesture!.faceVisible ? '윙크 넘김 켜짐 (얼굴 인식 중)' : '윙크 넘김 켜짐 (얼굴을 찾는 중)')
+                        : '윙크로 넘기기',
+                    icon: Icon(
+                      faceGesture!.running
+                          ? (faceGesture!.faceVisible ? Icons.face : Icons.face_retouching_off)
+                          : Icons.face_outlined,
+                    ),
+                  ),
+                ),
+              IconButton(
+                onPressed: onSync,
+                tooltip: '기기 동기화 / 리모컨',
+                icon: const Icon(Icons.devices_other_outlined),
               ),
               IconButton(
                 onPressed: () => controller.setAnnotating(true),
