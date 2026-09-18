@@ -57,6 +57,14 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# 한국어 Windows(코드페이지 949)에서는 일부 플러그인 소스의 UTF-8 문자가
+# C4819 경고를 내고, /WX 때문에 오류가 된다. 소스를 UTF-8 로 읽게 해 막는다.
+foreach(plugin ${FLUTTER_PLUGIN_LIST})
+  if(TARGET ${plugin}_plugin)
+    target_compile_options(${plugin}_plugin PRIVATE /utf-8 /wd4819)
+  endif()
+endforeach()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
