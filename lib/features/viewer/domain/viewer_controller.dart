@@ -19,6 +19,7 @@ class ViewerState {
     this.performanceMode = false,
     this.autoScrolling = false,
     this.autoScrollSeconds = 180,
+    this.annotating = false,
   });
 
   final int pageCount;
@@ -39,6 +40,9 @@ class ViewerState {
   /// 악보 전체를 자동으로 훑는 데 걸리는 시간(초).
   final double autoScrollSeconds;
 
+  /// 필기 모드. 켜지면 탭 영역이 꺼지고 페이지 위 필기 층이 입력을 받는다.
+  final bool annotating;
+
   bool get isStrip => layout == PageLayout.scroll || layout == PageLayout.half;
   bool get isPaged => !isStrip;
 
@@ -56,6 +60,7 @@ class ViewerState {
     bool? performanceMode,
     bool? autoScrolling,
     double? autoScrollSeconds,
+    bool? annotating,
   }) {
     return ViewerState(
       pageCount: pageCount ?? this.pageCount,
@@ -66,6 +71,7 @@ class ViewerState {
       performanceMode: performanceMode ?? this.performanceMode,
       autoScrolling: autoScrolling ?? this.autoScrolling,
       autoScrollSeconds: autoScrollSeconds ?? this.autoScrollSeconds,
+      annotating: annotating ?? this.annotating,
     );
   }
 }
@@ -162,4 +168,10 @@ class ViewerController extends ChangeNotifier {
 
   void setAutoScrollSeconds(double seconds) =>
       _set(_state.copyWith(autoScrollSeconds: seconds.clamp(10, 3600)));
+
+  void setAnnotating(bool value) {
+    if (value == _state.annotating) return;
+    // 필기 중에는 자동 스크롤이 손을 방해한다.
+    _set(_state.copyWith(annotating: value, autoScrolling: false));
+  }
 }

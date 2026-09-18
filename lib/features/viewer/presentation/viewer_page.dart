@@ -5,6 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/db/score_dao.dart';
 import '../../../core/db/tables.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../annotation/data/annotation_dao.dart';
+import '../../annotation/data/page_ink_store.dart';
+import '../../annotation/domain/annotation_tool_state.dart';
+import '../../annotation/presentation/annotation_toolbar.dart';
+import '../../annotation/presentation/ink_layer.dart';
 import '../data/score_session.dart';
 import '../domain/spreads.dart';
 import '../domain/viewer_controller.dart';
@@ -51,6 +56,8 @@ class _ViewerBody extends ConsumerStatefulWidget {
 
 class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   late final ViewerController _controller;
+  late final InkStore _inkStore;
+  final _tools = AnnotationToolState();
   bool _chromeVisible = true;
 
   /// 미리 굽기에 쓸 목표 폭. 화면이 만들어진 뒤에 정해진다.
@@ -73,6 +80,8 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       ),
     )..onPageChanged = _handlePageChanged;
 
+    _inkStore = InkStore(ref.read(annotationDaoProvider));
+
     // 첫 화면에 보일 페이지 주변을 미리 굽는다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _handlePageChanged(_controller.state.pageIndex);
@@ -82,7 +91,73 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   @override
   void dispose() {
     _controller.dispose();
+    _tools.dispose();
+    // 저장 큐를 비운 뒤 정리한다. 마지막 획이 사라지면 안 된다.
+    _inkStore.flushAll().whenComplete(_inkStore.dispose);
     super.dispose();
+  }
+
+  /// 페이지 위에 얹는 필기 층. 빈 페이지에도 필기는 된다.
+  Widget _inkOverlay(BuildContext context, ViewPage page, Size size) {
+    return InkLayer(
+      controller: _inkStore.of(page.scoreId, page.sourcePageNumber),
+      crop: page.crop,
+      rotation: page.rotation,
+      editing: _controller.state.annotating,
+      tools: _tools,
+      onRequestText: (initial) => _askText(context, initial),
+    );
+  }
+
+  Future<String?> _askText(BuildContext context, String initial) {
+    final controller = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('텍스트'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          minLines: 1,
+          decoration: const InputDecoration(hintText: 'rit. / 숨 쉬기 / 손가락 번호…'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('넣기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _clearAllInk() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('전체 필기를 지울까요?'),
+        content: const Text('이 곡의 모든 페이지에서 필기와 스탬프가 지워집니다. 열린 페이지는 실행 취소로 되돌릴 수 있습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('지우기'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    for (final score in widget.session.scores) {
+      await _inkStore.clearScore(score.id);
+    }
   }
 
   void _handlePageChanged(int pageIndex) {
@@ -158,8 +233,25 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
               child: Stack(
                 children: [
                   Positioned.fill(child: _buildContent(state)),
-                  Positioned.fill(child: _TapZones(onTap: _handleTap)),
-                  if (_chromeVisible && !state.performanceMode) ...[
+                  if (!state.annotating)
+                    Positioned.fill(child: _TapZones(onTap: _handleTap)),
+                  if (state.annotating)
+                    ListenableBuilder(
+                      listenable: _tools,
+                      builder: (context, _) => Positioned(
+                        top: _tools.toolbarAtBottom ? null : 0,
+                        bottom: _tools.toolbarAtBottom ? 0 : null,
+                        left: 0,
+                        right: 0,
+                        child: AnnotationToolbar(
+                          tools: _tools,
+                          pageController: _currentInkController(state),
+                          onClose: () => _controller.setAnnotating(false),
+                          onClearAll: _clearAllInk,
+                        ),
+                      ),
+                    ),
+                  if (_chromeVisible && !state.performanceMode && !state.annotating) ...[
                     Positioned(
                       top: 0,
                       left: 0,
@@ -208,6 +300,13 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     );
   }
 
+  /// 도구 막대의 실행 취소가 다룰 페이지. 2페이지 보기에서는 왼쪽 페이지다.
+  PageInkController? _currentInkController(ViewerState state) {
+    if (widget.session.pages.isEmpty) return null;
+    final page = widget.session.pages[state.pageIndex];
+    return _inkStore.of(page.scoreId, page.sourcePageNumber);
+  }
+
   /// 세트리스트를 보는 중이면 지금 페이지가 속한 곡 이름을 보여준다.
   String _titleFor(ViewerState state) {
     if (!widget.session.key.isSetlist || widget.session.pages.isEmpty) {
@@ -224,6 +323,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
         layout: state.layout,
         pageIndex: state.pageIndex,
         onPageChanged: _controller.reportPageChanged,
+        overlayBuilder: _inkOverlay,
         autoScrolling: state.autoScrolling,
         autoScrollSeconds: state.autoScrollSeconds,
         onAutoScrollFinished: () => _controller.setAutoScrolling(false),
@@ -240,6 +340,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       animation: state.animation,
       pageIndex: state.pageIndex,
       onPageChanged: _controller.reportPageChanged,
+      overlayBuilder: _inkOverlay,
     );
   }
 

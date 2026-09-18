@@ -16,6 +16,7 @@ class PagedScoreView extends StatefulWidget {
     required this.animation,
     required this.pageIndex,
     required this.onPageChanged,
+    this.overlayBuilder,
   });
 
   final ScoreSession session;
@@ -23,6 +24,7 @@ class PagedScoreView extends StatefulWidget {
   final TurnAnimation animation;
   final int pageIndex;
   final ValueChanged<int> onPageChanged;
+  final PageOverlayBuilder? overlayBuilder;
 
   @override
   State<PagedScoreView> createState() => PagedScoreViewState();
@@ -86,6 +88,7 @@ class PagedScoreViewState extends State<PagedScoreView> {
         final content = _Spread(
           session: widget.session,
           pages: widget.map.pagesOf(spread),
+          overlayBuilder: widget.overlayBuilder,
         );
 
         if (widget.animation == TurnAnimation.slide) {
@@ -139,10 +142,15 @@ class PagedScoreViewState extends State<PagedScoreView> {
 }
 
 class _Spread extends StatelessWidget {
-  const _Spread({required this.session, required this.pages});
+  const _Spread({
+    required this.session,
+    required this.pages,
+    this.overlayBuilder,
+  });
 
   final ScoreSession session;
   final List<int> pages;
+  final PageOverlayBuilder? overlayBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -153,6 +161,7 @@ class _Spread extends StatelessWidget {
         child: ScorePageView(
           session: session,
           page: session.pages[pages.first],
+          overlayBuilder: overlayBuilder,
         ),
       );
     }
@@ -163,7 +172,11 @@ class _Spread extends StatelessWidget {
       children: [
         for (final index in pages)
           Flexible(
-            child: ScorePageView(session: session, page: session.pages[index]),
+            child: ScorePageView(
+              session: session,
+              page: session.pages[index],
+              overlayBuilder: overlayBuilder,
+            ),
           ),
       ],
     );

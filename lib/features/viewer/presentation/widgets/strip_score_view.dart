@@ -17,6 +17,7 @@ class StripScoreView extends StatefulWidget {
     required this.layout,
     required this.pageIndex,
     required this.onPageChanged,
+    this.overlayBuilder,
     required this.autoScrolling,
     required this.autoScrollSeconds,
     required this.onAutoScrollFinished,
@@ -26,6 +27,7 @@ class StripScoreView extends StatefulWidget {
   final PageLayout layout;
   final int pageIndex;
   final ValueChanged<int> onPageChanged;
+  final PageOverlayBuilder? overlayBuilder;
   final bool autoScrolling;
   final double autoScrollSeconds;
   final VoidCallback onAutoScrollFinished;
@@ -160,6 +162,7 @@ class StripScoreViewState extends State<StripScoreView>
           itemBuilder: (context, index) => ScorePageView(
             session: widget.session,
             page: widget.session.pages[index],
+            overlayBuilder: widget.overlayBuilder,
           ),
         );
       },

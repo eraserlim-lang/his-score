@@ -4237,6 +4237,17 @@ class $InkStrokesTable extends InkStrokes
     requiredDuringInsert: false,
     defaultValue: const Constant(2),
   );
+  static const VerificationMeta _subtypeMeta = const VerificationMeta(
+    'subtype',
+  );
+  @override
+  late final GeneratedColumn<String> subtype = GeneratedColumn<String>(
+    'subtype',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _dataMeta = const VerificationMeta('data');
   @override
   late final GeneratedColumn<Uint8List> data = GeneratedColumn<Uint8List>(
@@ -4279,6 +4290,7 @@ class $InkStrokesTable extends InkStrokes
     tool,
     color,
     width,
+    subtype,
     data,
     sortOrder,
     createdAt,
@@ -4326,6 +4338,12 @@ class $InkStrokesTable extends InkStrokes
       context.handle(
         _widthMeta,
         width.isAcceptableOrUnknown(data['width']!, _widthMeta),
+      );
+    }
+    if (data.containsKey('subtype')) {
+      context.handle(
+        _subtypeMeta,
+        subtype.isAcceptableOrUnknown(data['subtype']!, _subtypeMeta),
       );
     }
     if (data.containsKey('data')) {
@@ -4389,6 +4407,10 @@ class $InkStrokesTable extends InkStrokes
         DriftSqlType.double,
         data['${effectivePrefix}width'],
       )!,
+      subtype: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subtype'],
+      ),
       data: attachedDatabase.typeMapping.read(
         DriftSqlType.blob,
         data['${effectivePrefix}data'],
@@ -4424,7 +4446,10 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
   final int color;
   final double width;
 
-  /// vector: 점 배열(x, y, 압력, 기울기)을 직렬화한 바이트.
+  /// 도구의 세부 종류. 펜이면 프리셋 이름, 도형이면 도형 이름.
+  final String? subtype;
+
+  /// vector: 점 배열(x, y, 압력)을 원본 페이지 기준 0~1 비율로 직렬화한 바이트.
   /// pencilKit: PKDrawing 의 dataRepresentation 바이트 그대로.
   final Uint8List data;
 
@@ -4439,6 +4464,7 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
     required this.tool,
     required this.color,
     required this.width,
+    this.subtype,
     required this.data,
     required this.sortOrder,
     required this.createdAt,
@@ -4459,6 +4485,9 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
     }
     map['color'] = Variable<int>(color);
     map['width'] = Variable<double>(width);
+    if (!nullToAbsent || subtype != null) {
+      map['subtype'] = Variable<String>(subtype);
+    }
     map['data'] = Variable<Uint8List>(data);
     map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -4474,6 +4503,9 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
       tool: Value(tool),
       color: Value(color),
       width: Value(width),
+      subtype: subtype == null && nullToAbsent
+          ? const Value.absent()
+          : Value(subtype),
       data: Value(data),
       sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
@@ -4497,6 +4529,7 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
       ),
       color: serializer.fromJson<int>(json['color']),
       width: serializer.fromJson<double>(json['width']),
+      subtype: serializer.fromJson<String?>(json['subtype']),
       data: serializer.fromJson<Uint8List>(json['data']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -4517,6 +4550,7 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
       ),
       'color': serializer.toJson<int>(color),
       'width': serializer.toJson<double>(width),
+      'subtype': serializer.toJson<String?>(subtype),
       'data': serializer.toJson<Uint8List>(data),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -4531,6 +4565,7 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
     StrokeTool? tool,
     int? color,
     double? width,
+    Value<String?> subtype = const Value.absent(),
     Uint8List? data,
     int? sortOrder,
     DateTime? createdAt,
@@ -4542,6 +4577,7 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
     tool: tool ?? this.tool,
     color: color ?? this.color,
     width: width ?? this.width,
+    subtype: subtype.present ? subtype.value : this.subtype,
     data: data ?? this.data,
     sortOrder: sortOrder ?? this.sortOrder,
     createdAt: createdAt ?? this.createdAt,
@@ -4555,6 +4591,7 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
       tool: data.tool.present ? data.tool.value : this.tool,
       color: data.color.present ? data.color.value : this.color,
       width: data.width.present ? data.width.value : this.width,
+      subtype: data.subtype.present ? data.subtype.value : this.subtype,
       data: data.data.present ? data.data.value : this.data,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -4571,6 +4608,7 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
           ..write('tool: $tool, ')
           ..write('color: $color, ')
           ..write('width: $width, ')
+          ..write('subtype: $subtype, ')
           ..write('data: $data, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt')
@@ -4587,6 +4625,7 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
     tool,
     color,
     width,
+    subtype,
     $driftBlobEquality.hash(data),
     sortOrder,
     createdAt,
@@ -4602,6 +4641,7 @@ class InkStroke extends DataClass implements Insertable<InkStroke> {
           other.tool == this.tool &&
           other.color == this.color &&
           other.width == this.width &&
+          other.subtype == this.subtype &&
           $driftBlobEquality.equals(other.data, this.data) &&
           other.sortOrder == this.sortOrder &&
           other.createdAt == this.createdAt);
@@ -4615,6 +4655,7 @@ class InkStrokesCompanion extends UpdateCompanion<InkStroke> {
   final Value<StrokeTool> tool;
   final Value<int> color;
   final Value<double> width;
+  final Value<String?> subtype;
   final Value<Uint8List> data;
   final Value<int> sortOrder;
   final Value<DateTime> createdAt;
@@ -4627,6 +4668,7 @@ class InkStrokesCompanion extends UpdateCompanion<InkStroke> {
     this.tool = const Value.absent(),
     this.color = const Value.absent(),
     this.width = const Value.absent(),
+    this.subtype = const Value.absent(),
     this.data = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -4640,6 +4682,7 @@ class InkStrokesCompanion extends UpdateCompanion<InkStroke> {
     this.tool = const Value.absent(),
     this.color = const Value.absent(),
     this.width = const Value.absent(),
+    this.subtype = const Value.absent(),
     required Uint8List data,
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -4656,6 +4699,7 @@ class InkStrokesCompanion extends UpdateCompanion<InkStroke> {
     Expression<int>? tool,
     Expression<int>? color,
     Expression<double>? width,
+    Expression<String>? subtype,
     Expression<Uint8List>? data,
     Expression<int>? sortOrder,
     Expression<DateTime>? createdAt,
@@ -4669,6 +4713,7 @@ class InkStrokesCompanion extends UpdateCompanion<InkStroke> {
       if (tool != null) 'tool': tool,
       if (color != null) 'color': color,
       if (width != null) 'width': width,
+      if (subtype != null) 'subtype': subtype,
       if (data != null) 'data': data,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
@@ -4684,6 +4729,7 @@ class InkStrokesCompanion extends UpdateCompanion<InkStroke> {
     Value<StrokeTool>? tool,
     Value<int>? color,
     Value<double>? width,
+    Value<String?>? subtype,
     Value<Uint8List>? data,
     Value<int>? sortOrder,
     Value<DateTime>? createdAt,
@@ -4697,6 +4743,7 @@ class InkStrokesCompanion extends UpdateCompanion<InkStroke> {
       tool: tool ?? this.tool,
       color: color ?? this.color,
       width: width ?? this.width,
+      subtype: subtype ?? this.subtype,
       data: data ?? this.data,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
@@ -4732,6 +4779,9 @@ class InkStrokesCompanion extends UpdateCompanion<InkStroke> {
     if (width.present) {
       map['width'] = Variable<double>(width.value);
     }
+    if (subtype.present) {
+      map['subtype'] = Variable<String>(subtype.value);
+    }
     if (data.present) {
       map['data'] = Variable<Uint8List>(data.value);
     }
@@ -4757,6 +4807,7 @@ class InkStrokesCompanion extends UpdateCompanion<InkStroke> {
           ..write('tool: $tool, ')
           ..write('color: $color, ')
           ..write('width: $width, ')
+          ..write('subtype: $subtype, ')
           ..write('data: $data, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
@@ -9891,6 +9942,7 @@ typedef $$InkStrokesTableCreateCompanionBuilder =
       Value<StrokeTool> tool,
       Value<int> color,
       Value<double> width,
+      Value<String?> subtype,
       required Uint8List data,
       Value<int> sortOrder,
       Value<DateTime> createdAt,
@@ -9905,6 +9957,7 @@ typedef $$InkStrokesTableUpdateCompanionBuilder =
       Value<StrokeTool> tool,
       Value<int> color,
       Value<double> width,
+      Value<String?> subtype,
       Value<Uint8List> data,
       Value<int> sortOrder,
       Value<DateTime> createdAt,
@@ -9971,6 +10024,11 @@ class $$InkStrokesTableFilterComposer
 
   ColumnFilters<double> get width => $composableBuilder(
     column: $table.width,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subtype => $composableBuilder(
+    column: $table.subtype,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10052,6 +10110,11 @@ class $$InkStrokesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get subtype => $composableBuilder(
+    column: $table.subtype,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<Uint8List> get data => $composableBuilder(
     column: $table.data,
     builder: (column) => ColumnOrderings(column),
@@ -10117,6 +10180,9 @@ class $$InkStrokesTableAnnotationComposer
 
   GeneratedColumn<double> get width =>
       $composableBuilder(column: $table.width, builder: (column) => column);
+
+  GeneratedColumn<String> get subtype =>
+      $composableBuilder(column: $table.subtype, builder: (column) => column);
 
   GeneratedColumn<Uint8List> get data =>
       $composableBuilder(column: $table.data, builder: (column) => column);
@@ -10186,6 +10252,7 @@ class $$InkStrokesTableTableManager
                 Value<StrokeTool> tool = const Value.absent(),
                 Value<int> color = const Value.absent(),
                 Value<double> width = const Value.absent(),
+                Value<String?> subtype = const Value.absent(),
                 Value<Uint8List> data = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -10198,6 +10265,7 @@ class $$InkStrokesTableTableManager
                 tool: tool,
                 color: color,
                 width: width,
+                subtype: subtype,
                 data: data,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
@@ -10212,6 +10280,7 @@ class $$InkStrokesTableTableManager
                 Value<StrokeTool> tool = const Value.absent(),
                 Value<int> color = const Value.absent(),
                 Value<double> width = const Value.absent(),
+                Value<String?> subtype = const Value.absent(),
                 required Uint8List data,
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -10224,6 +10293,7 @@ class $$InkStrokesTableTableManager
                 tool: tool,
                 color: color,
                 width: width,
+                subtype: subtype,
                 data: data,
                 sortOrder: sortOrder,
                 createdAt: createdAt,

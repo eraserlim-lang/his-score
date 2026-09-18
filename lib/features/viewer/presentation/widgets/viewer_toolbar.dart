@@ -50,6 +50,11 @@ class ViewerToolbar extends StatelessWidget {
               else
                 const Spacer(),
               IconButton(
+                onPressed: () => controller.setAnnotating(true),
+                tooltip: '필기',
+                icon: const Icon(Icons.draw_outlined),
+              ),
+              IconButton(
                 onPressed: () => controller.setPerformanceMode(true),
                 tooltip: '연주 모드',
                 icon: const Icon(Icons.music_note_outlined),

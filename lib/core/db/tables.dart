@@ -194,7 +194,10 @@ class InkStrokes extends Table {
   IntColumn get color => integer().withDefault(const Constant(0xFF000000))();
   RealColumn get width => real().withDefault(const Constant(2))();
 
-  /// vector: 점 배열(x, y, 압력, 기울기)을 직렬화한 바이트.
+  /// 도구의 세부 종류. 펜이면 프리셋 이름, 도형이면 도형 이름.
+  TextColumn get subtype => text().nullable()();
+
+  /// vector: 점 배열(x, y, 압력)을 원본 페이지 기준 0~1 비율로 직렬화한 바이트.
   /// pencilKit: PKDrawing 의 dataRepresentation 바이트 그대로.
   BlobColumn get data => blob()();
 
