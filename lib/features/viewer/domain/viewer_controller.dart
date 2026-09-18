@@ -20,6 +20,7 @@ class ViewerState {
     this.autoScrolling = false,
     this.autoScrollSeconds = 180,
     this.annotating = false,
+    this.editingJumps = false,
   });
 
   final int pageCount;
@@ -43,6 +44,12 @@ class ViewerState {
   /// 필기 모드. 켜지면 탭 영역이 꺼지고 페이지 위 필기 층이 입력을 받는다.
   final bool annotating;
 
+  /// 점프 버튼 편집 모드. 빈 곳을 눌러 버튼을 놓는다.
+  final bool editingJumps;
+
+  /// 탭 영역을 꺼야 하는 상태.
+  bool get overlayEditing => annotating || editingJumps;
+
   bool get isStrip => layout == PageLayout.scroll || layout == PageLayout.half;
   bool get isPaged => !isStrip;
 
@@ -61,6 +68,7 @@ class ViewerState {
     bool? autoScrolling,
     double? autoScrollSeconds,
     bool? annotating,
+    bool? editingJumps,
   }) {
     return ViewerState(
       pageCount: pageCount ?? this.pageCount,
@@ -72,6 +80,7 @@ class ViewerState {
       autoScrolling: autoScrolling ?? this.autoScrolling,
       autoScrollSeconds: autoScrollSeconds ?? this.autoScrollSeconds,
       annotating: annotating ?? this.annotating,
+      editingJumps: editingJumps ?? this.editingJumps,
     );
   }
 }
@@ -172,6 +181,11 @@ class ViewerController extends ChangeNotifier {
   void setAnnotating(bool value) {
     if (value == _state.annotating) return;
     // 필기 중에는 자동 스크롤이 손을 방해한다.
-    _set(_state.copyWith(annotating: value, autoScrolling: false));
+    _set(_state.copyWith(annotating: value, autoScrolling: false, editingJumps: false));
+  }
+
+  void setEditingJumps(bool value) {
+    if (value == _state.editingJumps) return;
+    _set(_state.copyWith(editingJumps: value, autoScrolling: false, annotating: false));
   }
 }

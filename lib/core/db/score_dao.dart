@@ -146,7 +146,10 @@ class ScoreDao extends DatabaseAccessor<AppDatabase> with _$ScoreDaoMixin {
     return transaction(() async {
       await (delete(scorePages)..where((t) => t.scoreId.equals(scoreId))).go();
       await batch((b) => b.insertAll(scorePages, pages));
-      final visible = pages.where((p) => p.hidden.value != true).length;
+      // hidden 을 안 준 행은 보이는 페이지다. absent 인 Value 의 .value 는 터진다.
+      final visible = pages
+          .where((p) => !(p.hidden.present && p.hidden.value))
+          .length;
       await updateScore(scoreId, ScoresCompanion(pageCount: Value(visible)));
     });
   }

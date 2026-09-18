@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,9 +11,15 @@ import '../../annotation/data/page_ink_store.dart';
 import '../../annotation/domain/annotation_tool_state.dart';
 import '../../annotation/presentation/annotation_toolbar.dart';
 import '../../annotation/presentation/ink_layer.dart';
+import '../../../core/db/database.dart';
+import '../data/page_tools_dao.dart';
 import '../data/score_session.dart';
 import '../domain/spreads.dart';
 import '../domain/viewer_controller.dart';
+import 'pages/page_order_page.dart';
+import 'sheets/bookmarks_sheet.dart';
+import 'sheets/crop_sheet.dart';
+import 'widgets/jump_layer.dart';
 import 'widgets/paged_score_view.dart';
 import 'widgets/strip_score_view.dart';
 import 'widgets/viewer_toolbar.dart';
@@ -78,7 +85,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
         startOnRight: score.startOnRight,
         autoScrollSeconds: (score.autoScrollSeconds ?? 180).toDouble(),
       ),
-    )..onPageChanged = _handlePageChanged;
+    )
+      ..onPageChanged = _handlePageChanged
+      ..addListener(_persistViewSettings);
 
     _inkStore = InkStore(ref.read(annotationDaoProvider));
 
@@ -97,16 +106,125 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     super.dispose();
   }
 
-  /// 페이지 위에 얹는 필기 층. 빈 페이지에도 필기는 된다.
+  ViewerState? _lastPersisted;
+
+  /// 보기 방식, 애니메이션, 펼침면, 자동 스크롤 속도를 곡에 남긴다.
+  /// 세트리스트는 첫 곡 설정을 빌려 쓰므로 기록하지 않는다.
+  void _persistViewSettings() {
+    if (widget.session.key.isSetlist) return;
+    final s = _controller.state;
+    final last = _lastPersisted;
+    if (last != null &&
+        last.layout == s.layout &&
+        last.animation == s.animation &&
+        last.startOnRight == s.startOnRight &&
+        last.autoScrollSeconds == s.autoScrollSeconds) {
+      return;
+    }
+    _lastPersisted = s;
+    ref.read(scoreDaoProvider).updateScore(
+          widget.session.primaryScore.id,
+          ScoresCompanion(
+            layout: Value(s.layout),
+            turnAnimation: Value(s.animation),
+            startOnRight: Value(s.startOnRight),
+            autoScrollSeconds: Value(s.autoScrollSeconds.round()),
+          ),
+        );
+  }
+
+  /// 페이지 위에 얹는 층. 필기가 아래, 점프 버튼이 위다.
   Widget _inkOverlay(BuildContext context, ViewPage page, Size size) {
-    return InkLayer(
-      controller: _inkStore.of(page.scoreId, page.sourcePageNumber),
-      crop: page.crop,
-      rotation: page.rotation,
-      editing: _controller.state.annotating,
-      tools: _tools,
-      onRequestText: (initial) => _askText(context, initial),
+    final state = _controller.state;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        InkLayer(
+          controller: _inkStore.of(page.scoreId, page.sourcePageNumber),
+          crop: page.crop,
+          rotation: page.rotation,
+          editing: state.annotating,
+          tools: _tools,
+          onRequestText: (initial) => _askText(context, initial),
+        ),
+        if (!state.annotating)
+          JumpLayer(
+            session: widget.session,
+            page: page,
+            editing: state.editingJumps,
+            onJump: _controller.goToPage,
+            onPlace: (n) => _placeJump(page, n),
+          ),
+      ],
     );
+  }
+
+  Future<void> _placeJump(ViewPage page, Offset n) async {
+    final target = await showDialog<int>(
+      context: context,
+      builder: (context) => _JumpTargetDialog(
+        session: widget.session,
+        page: page,
+      ),
+    );
+    if (target == null) return;
+    await ref.read(pageToolsDaoProvider).addJump(
+          scoreId: page.scoreId,
+          fromPage: page.sourcePageNumber,
+          x: n.dx,
+          y: n.dy,
+          toPage: target,
+        );
+  }
+
+  /// 크롭이나 순서를 바꾼 뒤 세션을 다시 연다. 보던 페이지는 유지한다.
+  void _reloadSession() {
+    final page = _controller.state.pageIndex;
+    ref.read(scoreDaoProvider).markOpened(widget.session.primaryScore.id, page);
+    ref.invalidate(scoreSessionProvider(widget.session.key));
+  }
+
+  ViewPage get _currentPage => widget.session.pages[_controller.state.pageIndex];
+
+  Future<void> _openPageMenu(String action) async {
+    final state = _controller.state;
+    switch (action) {
+      case 'bookmarks':
+        await showBookmarksSheet(
+          context,
+          session: widget.session,
+          current: _currentPage,
+          onJump: _controller.goToPage,
+        );
+      case 'crop':
+        final saved = await showCropSheet(
+          context,
+          session: widget.session,
+          current: _currentPage,
+        );
+        if (saved) _reloadSession();
+      case 'order':
+        final saved = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => PageOrderPage(
+              session: widget.session,
+              scoreId: _currentPage.scoreId,
+            ),
+          ),
+        );
+        if (saved == true) _reloadSession();
+      case 'jumps':
+        _controller.setEditingJumps(true);
+        setState(() => _chromeVisible = false);
+      case 'startOnRight':
+        _controller.setStartOnRight(!state.startOnRight);
+      case 'anim_slide':
+        _controller.setAnimation(TurnAnimation.slide);
+      case 'anim_stack':
+        _controller.setAnimation(TurnAnimation.stack);
+      case 'anim_curl':
+        _controller.setAnimation(TurnAnimation.curl);
+    }
   }
 
   Future<String?> _askText(BuildContext context, String initial) {
@@ -233,8 +351,37 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
               child: Stack(
                 children: [
                   Positioned.fill(child: _buildContent(state)),
-                  if (!state.annotating)
+                  if (!state.overlayEditing)
                     Positioned.fill(child: _TapZones(onTap: _handleTap)),
+                  if (state.editingJumps)
+                    Positioned(
+                      top: MediaQuery.paddingOf(context).top + 8,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Material(
+                          color: Theme.of(context).colorScheme.tertiaryContainer,
+                          borderRadius: BorderRadius.circular(24),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('빈 곳을 눌러 점프 버튼을 놓으세요'),
+                                const SizedBox(width: 8),
+                                FilledButton.tonal(
+                                  onPressed: () {
+                                    _controller.setEditingJumps(false);
+                                    setState(() => _chromeVisible = true);
+                                  },
+                                  child: const Text('완료'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   if (state.annotating)
                     ListenableBuilder(
                       listenable: _tools,
@@ -251,7 +398,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                         ),
                       ),
                     ),
-                  if (_chromeVisible && !state.performanceMode && !state.annotating) ...[
+                  if (_chromeVisible && !state.performanceMode && !state.overlayEditing) ...[
                     Positioned(
                       top: 0,
                       left: 0,
@@ -276,6 +423,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                             state: state,
                             controller: _controller,
                             isLandscape: isLandscape,
+                            onPageMenu: _openPageMenu,
                           ),
                         ],
                       ),
@@ -525,6 +673,62 @@ class _ErrorView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 점프 버튼의 목적 페이지를 고른다. 원본 페이지 번호(1-based)를 돌려준다.
+class _JumpTargetDialog extends StatefulWidget {
+  const _JumpTargetDialog({required this.session, required this.page});
+
+  final ScoreSession session;
+  final ViewPage page;
+
+  @override
+  State<_JumpTargetDialog> createState() => _JumpTargetDialogState();
+}
+
+class _JumpTargetDialogState extends State<_JumpTargetDialog> {
+  late int _target = widget.page.sourcePageNumber;
+
+  @override
+  Widget build(BuildContext context) {
+    final max = widget.session.documentFor(widget.page).pages.length;
+    return AlertDialog(
+      title: const Text('어느 페이지로 갈까요?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$_target쪽', style: Theme.of(context).textTheme.headlineSmall),
+          Slider(
+            value: _target.toDouble().clamp(1, max.toDouble()),
+            min: 1,
+            max: max.toDouble(),
+            divisions: max > 1 ? max - 1 : null,
+            onChanged: (v) => setState(() => _target = v.round()),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                onPressed: _target > 1 ? () => setState(() => _target--) : null,
+                icon: const Icon(Icons.remove),
+              ),
+              IconButton(
+                onPressed: _target < max ? () => setState(() => _target++) : null,
+                icon: const Icon(Icons.add),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _target),
+          child: const Text('놓기'),
+        ),
+      ],
     );
   }
 }

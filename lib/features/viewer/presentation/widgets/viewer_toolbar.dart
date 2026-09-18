@@ -10,11 +10,13 @@ class ViewerToolbar extends StatelessWidget {
     required this.state,
     required this.controller,
     required this.isLandscape,
+    required this.onPageMenu,
   });
 
   final ViewerState state;
   final ViewerController controller;
   final bool isLandscape;
+  final ValueChanged<String> onPageMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +51,53 @@ class ViewerToolbar extends StatelessWidget {
                 )
               else
                 const Spacer(),
+              PopupMenuButton<String>(
+                tooltip: '페이지 도구',
+                icon: const Icon(Icons.auto_stories_outlined),
+                onSelected: onPageMenu,
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'bookmarks',
+                    child: ListTile(leading: Icon(Icons.bookmark_border), title: Text('북마크')),
+                  ),
+                  const PopupMenuItem(
+                    value: 'crop',
+                    child: ListTile(leading: Icon(Icons.crop), title: Text('여백·기울기 조정')),
+                  ),
+                  const PopupMenuItem(
+                    value: 'order',
+                    child: ListTile(leading: Icon(Icons.reorder), title: Text('페이지 순서 편집')),
+                  ),
+                  const PopupMenuItem(
+                    value: 'jumps',
+                    child: ListTile(leading: Icon(Icons.call_missed_outgoing), title: Text('점프 버튼 편집')),
+                  ),
+                  const PopupMenuDivider(),
+                  if (state.layout == PageLayout.dual)
+                    CheckedPopupMenuItem(
+                      value: 'startOnRight',
+                      checked: state.startOnRight,
+                      child: const Text('첫 장을 오른쪽에'),
+                    ),
+                  if (state.isPaged) ...[
+                    CheckedPopupMenuItem(
+                      value: 'anim_slide',
+                      checked: state.animation == TurnAnimation.slide,
+                      child: const Text('넘김: 밀기'),
+                    ),
+                    CheckedPopupMenuItem(
+                      value: 'anim_stack',
+                      checked: state.animation == TurnAnimation.stack,
+                      child: const Text('넘김: 쌓기'),
+                    ),
+                    CheckedPopupMenuItem(
+                      value: 'anim_curl',
+                      checked: state.animation == TurnAnimation.curl,
+                      child: const Text('넘김: 넘기기'),
+                    ),
+                  ],
+                ],
+              ),
               IconButton(
                 onPressed: () => controller.setAnnotating(true),
                 tooltip: '필기',
