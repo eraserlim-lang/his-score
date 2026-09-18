@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdfrx/pdfrx.dart';
 
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+
+  // pdfium 을 올린다. 이걸 빼면 첫 악보를 여는 순간 죽는다.
+  await pdfrxFlutterInitialize();
+
+  await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
   runApp(const ProviderScope(child: HIScoreApp()));
 }
 
