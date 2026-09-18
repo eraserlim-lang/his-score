@@ -14,14 +14,14 @@ import 'widgets/viewer_toolbar.dart';
 
 /// 악보 보기 화면.
 class ViewerPage extends ConsumerWidget {
-  const ViewerPage({super.key, required this.scoreId, this.initialPage});
+  const ViewerPage({super.key, required this.sessionKey, this.initialPage});
 
-  final String scoreId;
+  final SessionKey sessionKey;
   final int? initialPage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(scoreSessionProvider(scoreId));
+    final session = ref.watch(scoreSessionProvider(sessionKey));
 
     return Scaffold(
       backgroundColor: ViewerColors.canvas,
@@ -30,7 +30,9 @@ class ViewerPage extends ConsumerWidget {
         error: (e, _) => _ErrorView(message: '$e'),
         data: (session) => _ViewerBody(
           session: session,
-          initialPage: initialPage ?? session.score.lastPage,
+          // 세트리스트는 항상 처음부터 시작한다. 공연 흐름과 맞다.
+          initialPage: initialPage ??
+              (session.key.isSetlist ? 0 : session.primaryScore.lastPage),
         ),
       ),
     );
@@ -57,7 +59,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   @override
   void initState() {
     super.initState();
-    final score = widget.session.score;
+    final score = widget.session.primaryScore;
     final pageCount = widget.session.pageCount;
 
     _controller = ViewerController(
@@ -86,13 +88,19 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   void _handlePageChanged(int pageIndex) {
     if (pageIndex < 0 || pageIndex >= widget.session.pageCount) return;
 
-    widget.session.cache.prefetch(
-      widget.session.pages[pageIndex].sourcePageNumber,
-      _renderWidth,
-    );
+    final page = widget.session.pages[pageIndex];
+    if (!page.isBlank) {
+      widget.session.cacheFor(page).prefetch(page.sourcePageNumber, _renderWidth);
+    }
 
     // 본 자리를 남겨 다음에 열 때 그대로 돌아오게 한다.
-    ref.read(scoreDaoProvider).markOpened(widget.session.score.id, pageIndex);
+    // 세트리스트는 곡마다 따로 기록하지 않고 열람 시각만 남긴다.
+    final dao = ref.read(scoreDaoProvider);
+    if (widget.session.key.isSetlist) {
+      dao.markOpened(page.scoreId, page.sourcePageNumber - 1);
+    } else {
+      dao.markOpened(page.scoreId, pageIndex);
+    }
   }
 
   void _toggleChrome() {
@@ -157,7 +165,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                       left: 0,
                       right: 0,
                       child: _TopBar(
-                        title: widget.session.score.title,
+                        title: _titleFor(state),
                         state: state,
                       ),
                     ),
@@ -198,6 +206,15 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
         );
       },
     );
+  }
+
+  /// 세트리스트를 보는 중이면 지금 페이지가 속한 곡 이름을 보여준다.
+  String _titleFor(ViewerState state) {
+    if (!widget.session.key.isSetlist || widget.session.pages.isEmpty) {
+      return widget.session.title;
+    }
+    final page = widget.session.pages[state.pageIndex];
+    return '${widget.session.title} · ${widget.session.scoreOf(page).title}';
   }
 
   Widget _buildContent(ViewerState state) {

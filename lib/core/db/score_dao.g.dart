@@ -6,6 +6,8 @@ part of 'score_dao.dart';
 mixin _$ScoreDaoMixin on DatabaseAccessor<AppDatabase> {
   $ScoresTable get scores => attachedDatabase.scores;
   $ScorePagesTable get scorePages => attachedDatabase.scorePages;
+  $TagsTable get tags => attachedDatabase.tags;
+  $ScoreTagsTable get scoreTags => attachedDatabase.scoreTags;
   ScoreDaoManager get managers => ScoreDaoManager(this);
 }
 
@@ -16,4 +18,8 @@ class ScoreDaoManager {
       $$ScoresTableTableManager(_db.attachedDatabase, _db.scores);
   $$ScorePagesTableTableManager get scorePages =>
       $$ScorePagesTableTableManager(_db.attachedDatabase, _db.scorePages);
+  $$TagsTableTableManager get tags =>
+      $$TagsTableTableManager(_db.attachedDatabase, _db.tags);
+  $$ScoreTagsTableTableManager get scoreTags =>
+      $$ScoreTagsTableTableManager(_db.attachedDatabase, _db.scoreTags);
 }

@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../layout/app_shell.dart';
 import '../../features/importer/presentation/import_page.dart';
 import '../../features/library/presentation/library_page.dart';
+import '../../features/setlist/presentation/setlist_detail_page.dart';
 import '../../features/setlist/presentation/setlist_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
+import '../../features/viewer/data/score_session.dart';
 import '../../features/viewer/presentation/viewer_page.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -38,6 +40,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/setlists',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: SetlistPage()),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) =>
+                    SetlistDetailPage(setlistId: state.pathParameters['id']!),
+              ),
+            ],
           ),
           GoRoute(
             path: '/import',
@@ -57,7 +66,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/score/:id',
         parentNavigatorKey: _rootKey,
         builder: (context, state) => ViewerPage(
-          scoreId: state.pathParameters['id']!,
+          sessionKey: SessionKey.score(state.pathParameters['id']!),
+          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+        ),
+      ),
+      GoRoute(
+        path: '/play/setlist/:id',
+        parentNavigatorKey: _rootKey,
+        builder: (context, state) => ViewerPage(
+          sessionKey: SessionKey.setlist(state.pathParameters['id']!),
           initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
         ),
       ),

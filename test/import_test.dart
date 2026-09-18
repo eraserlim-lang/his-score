@@ -6,6 +6,7 @@ import 'package:his_score/core/db/database.dart';
 import 'package:his_score/core/db/score_dao.dart';
 import 'package:his_score/core/storage/app_paths.dart';
 import 'package:his_score/features/importer/data/score_importer.dart';
+import 'package:his_score/features/library/data/cover_generator.dart';
 import 'package:his_score/features/viewer/data/score_session.dart';
 import 'package:pdfrx/pdfrx.dart';
 
@@ -29,7 +30,7 @@ void main() {
     await paths.ensureCreated();
     db = AppDatabase(NativeDatabase.memory());
     dao = ScoreDao(db);
-    importer = ScoreImporter(dao, paths);
+    importer = ScoreImporter(dao, paths, CoverGenerator(paths));
   });
 
   tearDown(() async {
@@ -71,7 +72,7 @@ void main() {
     final score = await dao.findById(id!);
     final pages = await dao.visiblePages(id);
 
-    final session = await ScoreSession.open(
+    final session = await ScoreSession.openScore(
       score: score!,
       scorePages: pages,
       paths: paths,
@@ -79,7 +80,7 @@ void main() {
     addTearDown(session.dispose);
 
     expect(session.pageCount, 8);
-    expect(session.document.pages.length, 8);
+    expect(session.documents.single.pages.length, 8);
   });
 
   test('여러 개를 한 번에 들여오고 실패한 것만 따로 알린다', () async {
@@ -91,6 +92,14 @@ void main() {
     expect(result.imported, hasLength(1));
     expect(result.hasFailures, isTrue);
     expect(result.failures.keys.single, '없는파일.pdf');
+  });
+
+  test('가져오면 첫 페이지로 표지를 만든다', () async {
+    final id = await importer.importFile(File('test/fixtures/score.pdf'));
+    final score = await dao.findById(id!);
+    expect(score!.coverPath, isNotNull);
+    expect(paths.resolve(score.coverPath!).existsSync(), isTrue);
+    expect(paths.resolve(score.coverPath!).lengthSync(), greaterThan(1000));
   });
 
   test('마지막으로 본 페이지가 남는다', () async {

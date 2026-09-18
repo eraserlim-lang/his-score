@@ -40,7 +40,7 @@ void main() {
     await File('test/fixtures/score.pdf').copy('${root.path}/scores/t.pdf');
 
     final now = DateTime.now();
-    session = await ScoreSession.open(
+    session = await ScoreSession.openScore(
       score: Score(
         id: 't',
         title: '테스트 악보',
