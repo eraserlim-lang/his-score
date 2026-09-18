@@ -25,6 +25,25 @@ final class PencilKitViewFactory: NSObject, FlutterPlatformViewFactory {
 
   static func register(with registrar: FlutterPluginRegistrar) {
     registrar.register(PencilKitViewFactory(messenger: registrar.messenger()), withId: "hiscore/pencilkit")
+
+    // 화면에 캔버스가 없어도 PKDrawing 을 PNG 로 굽는 정적 채널. 내보내기에서 쓴다.
+    let render = FlutterMethodChannel(name: "hiscore/pencilkit_render", binaryMessenger: registrar.messenger())
+    render.setMethodCallHandler { call, result in
+      guard call.method == "render",
+            let dict = call.arguments as? [String: Any],
+            let data = dict["data"] as? FlutterStandardTypedData,
+            let width = dict["width"] as? Int,
+            let height = dict["height"] as? Int,
+            let drawing = try? PKDrawing(data: data.data) else {
+        result(nil)
+        return
+      }
+      let refWidth: CGFloat = 1000
+      let refHeight = refWidth * CGFloat(height) / CGFloat(width)
+      let rect = CGRect(x: 0, y: 0, width: refWidth, height: refHeight)
+      let image = drawing.image(from: rect, scale: CGFloat(width) / refWidth)
+      result(image.pngData().map { FlutterStandardTypedData(bytes: $0) })
+    }
   }
 }
 

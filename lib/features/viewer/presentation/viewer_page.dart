@@ -14,6 +14,7 @@ import '../../annotation/data/page_ink_store.dart';
 import '../../annotation/domain/annotation_tool_state.dart';
 import '../../annotation/presentation/annotation_toolbar.dart';
 import '../../annotation/presentation/ink_layer.dart';
+import '../../export/presentation/export_sheet.dart';
 import '../../sync/presentation/sync_sheet.dart';
 import '../../tools/presentation/tools_panel.dart';
 import '../../../core/db/settings_dao.dart';
@@ -267,6 +268,13 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       case 'jumps':
         _controller.setEditingJumps(true);
         setState(() => _chromeVisible = false);
+      case 'export':
+        final score = widget.session.scoreOf(_currentPage);
+        await showExportSheet(
+          context,
+          score: score,
+          visiblePageCount: widget.session.pages.where((p) => p.scoreId == score.id).length,
+        );
       case 'startOnRight':
         _controller.setStartOnRight(!state.startOnRight);
       case 'anim_slide':

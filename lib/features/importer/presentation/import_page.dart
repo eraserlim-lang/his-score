@@ -10,6 +10,7 @@ import 'capture_page.dart';
 import 'cloud_browser_page.dart';
 import 'imslp_page.dart';
 import 'import_actions.dart';
+import '../../setlist/presentation/setlist_share_actions.dart';
 
 /// 가져오기 허브.
 class ImportPage extends ConsumerWidget {
@@ -52,6 +53,12 @@ class ImportPage extends ConsumerWidget {
             title: '무료 클래식 악보',
             subtitle: 'IMSLP 에서 검색해 내려받습니다',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ImslpPage())),
+          ),
+          _Source(
+            icon: Icons.queue_music,
+            title: '세트리스트 파일',
+            subtitle: '다른 기기에서 공유한 .hisetlist 또는 zip',
+            onTap: () => importSetlistFile(context, ref),
           ),
           if (WatchFolderService.supported)
             _Source(

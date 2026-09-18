@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/db/score_dao.dart';
 import '../../../core/db/setlist_dao.dart';
 import '../../library/presentation/tag_manager_sheet.dart';
+import 'setlist_share_actions.dart';
 
 /// 세트리스트 목록.
 class SetlistPage extends ConsumerWidget {
@@ -15,7 +16,16 @@ class SetlistPage extends ConsumerWidget {
     final setlists = ref.watch(setlistsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('세트리스트')),
+      appBar: AppBar(
+        title: const Text('세트리스트'),
+        actions: [
+          IconButton(
+            onPressed: () => importSetlistFile(context, ref),
+            icon: const Icon(Icons.file_open_outlined),
+            tooltip: '세트리스트 파일 가져오기',
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => createSetlist(context, ref),
         icon: const Icon(Icons.add),
@@ -72,6 +82,8 @@ class SetlistPage extends ConsumerWidget {
                       switch (v) {
                         case 'play':
                           context.push('/play/setlist/${entry.setlist.id}');
+                        case 'share':
+                          await shareSetlist(context, ref, entry.setlist.id, entry.setlist.name);
                         case 'duplicate':
                           await dao.duplicate(entry.setlist.id);
                         case 'delete':
@@ -86,6 +98,7 @@ class SetlistPage extends ConsumerWidget {
                         enabled: entry.itemCount > 0,
                         child: const Text('연주하기'),
                       ),
+                      const PopupMenuItem(value: 'share', child: Text('공유')),
                       const PopupMenuItem(value: 'duplicate', child: Text('복제')),
                       const PopupMenuItem(value: 'delete', child: Text('지우기')),
                     ],

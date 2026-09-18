@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/settings_dao.dart';
+import '../../backup/presentation/backup_tiles.dart';
 import '../../importer/data/watch_folder_service.dart';
 import '../../sync/presentation/sync_sheet.dart';
 import '../../viewer/domain/turn_input.dart';
@@ -54,6 +55,8 @@ class SettingsPage extends ConsumerWidget {
             title: 'Dropbox 앱 키',
             hint: 'App key',
           ),
+          const _SectionHeader('백업'),
+          const BackupTiles(),
           const _SectionHeader('정보'),
           const ListTile(
             leading: Icon(Icons.info_outline),

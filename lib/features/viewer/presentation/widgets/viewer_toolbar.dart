@@ -79,6 +79,10 @@ class ViewerToolbar extends StatelessWidget {
                     value: 'jumps',
                     child: ListTile(leading: Icon(Icons.call_missed_outgoing), title: Text('점프 버튼 편집')),
                   ),
+                  const PopupMenuItem(
+                    value: 'export',
+                    child: ListTile(leading: Icon(Icons.ios_share), title: Text('내보내기 · 인쇄')),
+                  ),
                   const PopupMenuDivider(),
                   if (state.layout == PageLayout.dual)
                     CheckedPopupMenuItem(

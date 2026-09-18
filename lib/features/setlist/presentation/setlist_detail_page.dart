@@ -6,6 +6,7 @@ import '../../../core/db/score_dao.dart';
 import '../../../core/db/setlist_dao.dart';
 import '../../library/presentation/cover_image.dart';
 import '../../library/presentation/tag_manager_sheet.dart';
+import 'setlist_share_actions.dart';
 
 /// 세트리스트 하나. 순서 바꾸기, 곡 추가/제거, 구간 지정.
 class SetlistDetailPage extends ConsumerWidget {
@@ -40,6 +41,11 @@ class SetlistDetailPage extends ConsumerWidget {
             onPressed: () => _addScores(context, ref),
             icon: const Icon(Icons.playlist_add),
             tooltip: '곡 추가',
+          ),
+          IconButton(
+            onPressed: () => shareSetlist(context, ref, setlistId, setlist.name),
+            icon: const Icon(Icons.share_outlined),
+            tooltip: '공유',
           ),
         ],
       ),
