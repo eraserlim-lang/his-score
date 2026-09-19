@@ -72,20 +72,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       /// 악보 보기는 껍데기 밖에서 전체 화면으로 연다.
+      ///
+      /// 탭을 옮길 때마다 pushReplacement 로 이 경로를 다시 여는데, 기본
+      /// 전환을 쓰면 악보가 옆에서 밀려 들어온다. 곡을 오가는 것뿐이라
+      /// 그 움직임이 거슬려 전환을 없앤다.
       GoRoute(
         path: '/score/:id',
         parentNavigatorKey: _rootKey,
-        builder: (context, state) => ViewerPage(
-          sessionKey: SessionKey.score(state.pathParameters['id']!),
-          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: ViewerPage(
+            sessionKey: SessionKey.score(state.pathParameters['id']!),
+            initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+          ),
         ),
       ),
       GoRoute(
         path: '/play/setlist/:id',
         parentNavigatorKey: _rootKey,
-        builder: (context, state) => ViewerPage(
-          sessionKey: SessionKey.setlist(state.pathParameters['id']!),
-          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: ViewerPage(
+            sessionKey: SessionKey.setlist(state.pathParameters['id']!),
+            initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+          ),
         ),
       ),
     ],

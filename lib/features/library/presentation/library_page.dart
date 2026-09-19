@@ -194,6 +194,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   icon: Icon(grid ? Icons.view_list : Icons.grid_view),
                   tooltip: grid ? tr('목록으로 보기') : tr('격자로 보기'),
                 ),
+                // 그룹(태그)은 만들기 전에는 태그 줄이 뜨지 않아 있는 줄도
+                // 몰랐다. 막대에 늘 내놓아 여기서 시작할 수 있게 한다.
+                IconButton(
+                  onPressed: () => showTagManagerSheet(context),
+                  icon: const Icon(Icons.folder_outlined),
+                  tooltip: tr('그룹 관리'),
+                ),
                 PopupMenuButton<ScoreSort>(
                   tooltip: tr('정렬'),
                   initialValue: query.sort,

@@ -11,6 +11,80 @@ import '../../sync/presentation/sync_sheet.dart';
 import '../../viewer/domain/turn_input.dart';
 import '../../viewer/domain/viewer_controller.dart';
 
+/// 눌러서 고르는 설정 한 줄.
+///
+/// 점 세 개만 눌러야 했더니 손가락으로는 잘 안 맞았다. 줄 어디를 눌러도
+/// 열리게 하고, 지금 고른 값을 오른쪽에 적어 펼치지 않고도 알 수 있게 한다.
+class _ChoiceTile<T> extends StatelessWidget {
+  const _ChoiceTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.items,
+    required this.onSelected,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+
+  /// 오른쪽에 적을 지금 상태.
+  final String value;
+
+  final String? subtitle;
+  final List<PopupMenuEntry<T>> Function(BuildContext context) items;
+  final ValueChanged<T> onSelected;
+
+  Future<void> _open(BuildContext context) async {
+    final tile = context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (tile == null || overlay == null) return;
+
+    final corner = tile.localToGlobal(Offset.zero, ancestor: overlay);
+    final selected = await showMenu<T>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        corner.dx + tile.size.width,
+        corner.dy + tile.size.height,
+        overlay.size.width - corner.dx - tile.size.width,
+        0,
+      ),
+      items: items(context),
+    );
+    if (selected != null) onSelected(selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: subtitle == null ? null : Text(subtitle!),
+      onTap: () => _open(context),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 180),
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: scheme.primary),
+            ),
+          ),
+          Icon(Icons.arrow_drop_down, color: scheme.onSurfaceVariant),
+        ],
+      ),
+    );
+  }
+}
+
 /// 설정.
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -170,30 +244,28 @@ class _PedalTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final raw = ref.watch(settingProvider(SettingKeys.pedalNext)).value;
     final mapping = PedalMapping.decode(raw);
-    return ListTile(
-      leading: Icon(Icons.keyboard_alt_outlined),
-      title: Text(tr('페달 / 키보드 매핑')),
-      subtitle: Text(tr('다음 {0}개 키, 이전 {1}개 키', [mapping.next.length, mapping.previous.length])),
-      trailing: PopupMenuButton<String>(
-        onSelected: (v) async {
-          if (v == 'reset') {
-            await ref.read(settingsDaoProvider).set(SettingKeys.pedalNext, null);
-            return;
-          }
-          final cmd = v == 'next' ? TurnCommand.next : TurnCommand.previous;
-          final key = await _learn(context, cmd);
-          if (key == null) return;
-          final updated = cmd == TurnCommand.next
-              ? mapping.withLearned(nextKey: key.keyId)
-              : mapping.withLearned(previousKey: key.keyId);
-          await ref.read(settingsDaoProvider).set(SettingKeys.pedalNext, updated.encode());
-        },
-        itemBuilder: (context) => [
-          PopupMenuItem(value: 'next', child: Text(tr('"다음" 페달 학습'))),
-          PopupMenuItem(value: 'previous', child: Text(tr('"이전" 페달 학습'))),
-          PopupMenuItem(value: 'reset', child: Text(tr('기본값으로'))),
-        ],
-      ),
+    return _ChoiceTile<String>(
+      icon: Icons.keyboard_alt_outlined,
+      title: tr('페달 / 키보드 매핑'),
+      value: tr('다음 {0} · 이전 {1}', [mapping.next.length, mapping.previous.length]),
+      onSelected: (v) async {
+        if (v == 'reset') {
+          await ref.read(settingsDaoProvider).set(SettingKeys.pedalNext, null);
+          return;
+        }
+        final cmd = v == 'next' ? TurnCommand.next : TurnCommand.previous;
+        final key = await _learn(context, cmd);
+        if (key == null) return;
+        final updated = cmd == TurnCommand.next
+            ? mapping.withLearned(nextKey: key.keyId)
+            : mapping.withLearned(previousKey: key.keyId);
+        await ref.read(settingsDaoProvider).set(SettingKeys.pedalNext, updated.encode());
+      },
+      items: (context) => [
+        PopupMenuItem(value: 'next', child: Text(tr('"다음" 페달 학습'))),
+        PopupMenuItem(value: 'previous', child: Text(tr('"이전" 페달 학습'))),
+        PopupMenuItem(value: 'reset', child: Text(tr('기본값으로'))),
+      ],
     );
   }
 
@@ -229,21 +301,19 @@ class _LanguageTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final saved = ref.watch(settingProvider(SettingKeys.locale)).value;
-    return ListTile(
-      leading: const Icon(Icons.language),
-      title: Text(tr('언어')),
-      subtitle: Text(AppLocale.labelOf(saved == null ? null : Locale(saved))),
-      trailing: PopupMenuButton<String>(
-        onSelected: (v) async {
-          await ref.read(settingsDaoProvider).set(SettingKeys.locale, v == 'system' ? null : v);
-          AppLocale.override.value = v == 'system' ? null : Locale(v);
-        },
-        itemBuilder: (context) => [
-          PopupMenuItem(value: 'system', child: Text(AppLocale.labelOf(null))),
-          for (final l in AppLocale.supported)
-            PopupMenuItem(value: l.languageCode, child: Text(AppLocale.labelOf(l))),
-        ],
-      ),
+    return _ChoiceTile<String>(
+      icon: Icons.language,
+      title: tr('언어'),
+      value: AppLocale.labelOf(saved == null ? null : Locale(saved)),
+      onSelected: (v) async {
+        await ref.read(settingsDaoProvider).set(SettingKeys.locale, v == 'system' ? null : v);
+        AppLocale.override.value = v == 'system' ? null : Locale(v);
+      },
+      items: (context) => [
+        PopupMenuItem(value: 'system', child: Text(AppLocale.labelOf(null))),
+        for (final l in AppLocale.supported)
+          PopupMenuItem(value: l.languageCode, child: Text(AppLocale.labelOf(l))),
+      ],
     );
   }
 }
@@ -259,17 +329,16 @@ class _ThemeTile extends ConsumerWidget {
           'dark' => tr('어둡게'),
           _ => tr('시스템 설정'),
         };
-    return ListTile(
-      leading: const Icon(Icons.brightness_6_outlined),
-      title: Text(tr('테마')),
-      subtitle: Text(label(saved)),
-      trailing: PopupMenuButton<String>(
-        onSelected: (v) => ref.read(settingsDaoProvider).set(SettingKeys.themeMode, v == 'system' ? null : v),
-        itemBuilder: (context) => [
-          for (final v in ['system', 'light', 'dark'])
-            PopupMenuItem(value: v, child: Text(label(v))),
-        ],
-      ),
+    return _ChoiceTile<String>(
+      icon: Icons.brightness_6_outlined,
+      title: tr('테마'),
+      value: label(saved),
+      onSelected: (v) =>
+          ref.read(settingsDaoProvider).set(SettingKeys.themeMode, v == 'system' ? null : v),
+      items: (context) => [
+        for (final v in ['system', 'light', 'dark'])
+          PopupMenuItem(value: v, child: Text(label(v))),
+      ],
     );
   }
 }
