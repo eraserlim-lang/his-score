@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/score_dao.dart';
+import '../../../core/layout/center_sheet.dart';
 import '../../../core/db/tables.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../annotation/data/annotation_dao.dart';
@@ -65,7 +67,8 @@ class _ViewerPageState extends ConsumerState<ViewerPage> {
           session: session,
           // 세트리스트는 항상 처음부터 시작한다. 공연 흐름과 맞다.
           // 탭으로 열어 둔 문서는 떠날 때 보던 자리로 돌아간다.
-          initialPage: _restorePage ??
+          initialPage:
+              _restorePage ??
               widget.initialPage ??
               ref.read(openTabsProvider.notifier).pageOf(widget.sessionKey) ??
               (session.key.isSetlist ? 0 : session.primaryScore.lastPage),
@@ -102,6 +105,27 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   final _tools = AnnotationToolState();
   bool _chromeVisible = true;
 
+  /// 메뉴를 띄운 뒤 손이 닿지 않으면 이만큼 지나 거둔다.
+  static const _chromeIdle = Duration(seconds: 5);
+  Timer? _chromeTimer;
+
+  /// 메뉴가 보이는 동안 5초 타이머를 (다시) 건다. 연주 중에 막대가 악보를
+  /// 가리고 있으면 방해라, 손이 닿을 때마다 다시 세고 잠잠하면 거둔다.
+  void _armChromeTimer() {
+    _chromeTimer?.cancel();
+    if (!_chromeVisible) return;
+    _chromeTimer = Timer(_chromeIdle, () {
+      if (!mounted) return;
+      // 위에 시트나 대화상자가 떠 있으면 그 뒤에서 거두지 않는다. 닫고 돌아왔을
+      // 때 메뉴가 사라져 있으면 당황한다. 닫힐 때까지 다시 센다.
+      if (ModalRoute.of(context)?.isCurrent != true) {
+        _armChromeTimer();
+        return;
+      }
+      setState(() => _chromeVisible = false);
+    });
+  }
+
   late final TurnInputHub _hub;
   StreamSubscription<TurnCommand>? _hubSub;
   StreamSubscription<ViewerPosition>? _remoteSub;
@@ -116,22 +140,27 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     final score = widget.session.primaryScore;
     final pageCount = widget.session.pageCount;
 
-    _controller = ViewerController(
-      ViewerState(
-        pageCount: pageCount,
-        layout: score.layout ?? PageLayout.single,
-        animation: score.turnAnimation ?? TurnAnimation.slide,
-        pageIndex: widget.initialPage.clamp(0, (pageCount - 1).clamp(0, 1 << 30)),
-        startOnRight: score.startOnRight,
-        dualStepOne: score.dualStepOne ?? true,
-        autoScrollSeconds: (score.autoScrollSeconds ?? 180).toDouble(),
-      ),
-    )
-      ..onPageChanged = _handlePageChanged
-      ..addListener(_persistViewSettings);
+    _controller =
+        ViewerController(
+            ViewerState(
+              pageCount: pageCount,
+              layout: score.layout ?? PageLayout.single,
+              animation: score.turnAnimation ?? TurnAnimation.slide,
+              pageIndex: widget.initialPage.clamp(
+                0,
+                (pageCount - 1).clamp(0, 1 << 30),
+              ),
+              startOnRight: score.startOnRight,
+              dualStepOne: score.dualStepOne ?? true,
+              autoScrollSeconds: (score.autoScrollSeconds ?? 180).toDouble(),
+            ),
+          )
+          ..onPageChanged = _handlePageChanged
+          ..addListener(_persistViewSettings);
 
     _inkStore = InkStore(ref.read(annotationDaoProvider));
     _faceTurn = ref.read(faceTurnServiceProvider);
+    _armChromeTimer();
 
     // 페달, 얼굴 제스처, 리모컨, 리드 기기가 보내는 명령을 받는다.
     _hub = ref.read(turnInputHubProvider)..viewerOpen = true;
@@ -145,7 +174,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     // 첫 화면에 보일 페이지 주변을 미리 굽고, 상단 탭에 이 문서를 올린다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(openTabsProvider.notifier).open(
+      ref
+          .read(openTabsProvider.notifier)
+          .open(
             widget.session.key,
             widget.session.title,
             page: _controller.state.pageIndex,
@@ -192,6 +223,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
 
   @override
   void dispose() {
+    _chromeTimer?.cancel();
     HardwareKeyboard.instance.removeHandler(_onKey);
     _hubSub?.cancel();
     _remoteSub?.cancel();
@@ -221,7 +253,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       return;
     }
     _lastPersisted = s;
-    ref.read(scoreDaoProvider).updateScore(
+    ref
+        .read(scoreDaoProvider)
+        .updateScore(
           widget.session.primaryScore.id,
           ScoresCompanion(
             layout: Value(s.layout),
@@ -246,6 +280,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
           editing: state.annotating,
           tools: _tools,
           onRequestText: (initial) => _askText(context, initial),
+          onRequestStamp: (current) => _askStamp(context, current),
         ),
         if (!state.annotating)
           JumpLayer(
@@ -262,13 +297,13 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   Future<void> _placeJump(ViewPage page, Offset n) async {
     final target = await showDialog<int>(
       context: context,
-      builder: (context) => _JumpTargetDialog(
-        session: widget.session,
-        page: page,
-      ),
+      builder: (context) =>
+          _JumpTargetDialog(session: widget.session, page: page),
     );
     if (target == null) return;
-    await ref.read(pageToolsDaoProvider).addJump(
+    await ref
+        .read(pageToolsDaoProvider)
+        .addJump(
           scoreId: page.scoreId,
           fromPage: page.sourcePageNumber,
           x: n.dx,
@@ -281,7 +316,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   void _reloadSession() {
     final page = _controller.state.pageIndex;
     if (!widget.session.key.isSetlist) {
-      ref.read(scoreDaoProvider).markOpened(widget.session.primaryScore.id, page);
+      ref
+          .read(scoreDaoProvider)
+          .markOpened(widget.session.primaryScore.id, page);
     }
     widget.onReopen(page);
     ref.invalidate(scoreSessionProvider(widget.session.key));
@@ -305,7 +342,8 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     }
   }
 
-  ViewPage get _currentPage => widget.session.pages[_controller.state.pageIndex];
+  ViewPage get _currentPage =>
+      widget.session.pages[_controller.state.pageIndex];
 
   /// 곡 안에서 몇 번째 쪽을 보고 있는지(0-based, 보이는 순서 기준).
   ///
@@ -406,7 +444,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
             builder: (_) => PageOrderPage(
               session: widget.session,
               // 세트리스트는 세트에 든 모든 곡의 페이지를 한 줄로 놓고 고친다.
-              scoreId: widget.session.key.isSetlist ? null : _currentPage.scoreId,
+              scoreId: widget.session.key.isSetlist
+                  ? null
+                  : _currentPage.scoreId,
             ),
           ),
         );
@@ -414,6 +454,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       case 'jumps':
         _controller.setEditingJumps(true);
         setState(() => _chromeVisible = false);
+        _armChromeTimer();
       case 'savePage':
         await showPageSaveSheet(
           context,
@@ -431,7 +472,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
         await showExportSheet(
           context,
           score: score,
-          visiblePageCount: widget.session.pages.where((p) => p.scoreId == score.id).length,
+          visiblePageCount: widget.session.pages
+              .where((p) => p.scoreId == score.id)
+              .length,
         );
       case 'startOnRight':
         _controller.setStartOnRight(!state.startOnRight);
@@ -444,6 +487,23 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       case 'anim_curl':
         _controller.setAnimation(TurnAnimation.curl);
     }
+  }
+
+  /// 놓아 둔 스탬프를 다른 기호로 바꾼다.
+  Future<String?> _askStamp(BuildContext context, String current) {
+    return showCenterSheet<String>(
+      context,
+      maxWidth: 560,
+      fill: true,
+      scrollable: false,
+      child: Builder(
+        builder: (sheetContext) => StampPalette(
+          selected: current,
+          color: _tools.color,
+          onSelected: (id) => Navigator.pop(sheetContext, id),
+        ),
+      ),
+    );
   }
 
   Future<String?> _askText(BuildContext context, String initial) {
@@ -478,7 +538,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(tr('전체 필기를 지울까요?')),
-        content: Text(tr('이 곡의 모든 페이지에서 필기와 스탬프가 지워집니다. 열린 페이지는 실행 취소로 되돌릴 수 있습니다.')),
+        content: Text(
+          tr('이 곡의 모든 페이지에서 필기와 스탬프가 지워집니다. 열린 페이지는 실행 취소로 되돌릴 수 있습니다.'),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -501,7 +563,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     if (pageIndex < 0 || pageIndex >= widget.session.pageCount) return;
 
     // 탭으로 돌아왔을 때 이 자리에서 다시 시작한다.
-    ref.read(openTabsProvider.notifier).updatePage(widget.session.key, pageIndex);
+    ref
+        .read(openTabsProvider.notifier)
+        .updatePage(widget.session.key, pageIndex);
 
     final page = widget.session.pages[pageIndex];
     _hub.reportPosition(
@@ -514,7 +578,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       ),
     );
     if (!page.isBlank) {
-      widget.session.cacheFor(page).prefetch(page.sourcePageNumber, _renderWidth);
+      widget.session
+          .cacheFor(page)
+          .prefetch(page.sourcePageNumber, _renderWidth);
     }
 
     // 본 자리를 남겨 다음에 열 때 그대로 돌아오게 한다.
@@ -530,6 +596,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   void _toggleChrome() {
     if (_controller.state.performanceMode) return;
     setState(() => _chromeVisible = !_chromeVisible);
+    _armChromeTimer();
   }
 
   /// 화면을 세로로 3등분해 좌/우는 넘김, 가운데는 메뉴 토글로 쓴다.
@@ -573,7 +640,12 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
             if (!didPop) _controller.setPerformanceMode(false);
           },
           child: Focus(
-              autofocus: true,
+            autofocus: true,
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) {
+                if (_chromeVisible) _armChromeTimer();
+              },
               child: Stack(
                 children: [
                   Positioned.fill(child: _buildContent(state)),
@@ -591,7 +663,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                       right: 0,
                       child: Center(
                         child: Material(
-                          color: Theme.of(context).colorScheme.tertiaryContainer,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.tertiaryContainer,
                           borderRadius: BorderRadius.circular(24),
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
@@ -604,6 +678,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                                   onPressed: () {
                                     _controller.setEditingJumps(false);
                                     setState(() => _chromeVisible = true);
+                                    _armChromeTimer();
                                   },
                                   child: Text(tr('완료')),
                                 ),
@@ -629,7 +704,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                         ),
                       ),
                     ),
-                  if (_chromeVisible && !state.performanceMode && !state.overlayEditing) ...[
+                  if (_chromeVisible &&
+                      !state.performanceMode &&
+                      !state.overlayEditing) ...[
                     Positioned(
                       top: 0,
                       left: 0,
@@ -675,6 +752,21 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                       ),
                     ),
                   ],
+                  // 윙크 넘김이 켜져 있으면 눈 상태를 악보 위에 반투명으로 보여 준다.
+                  if (FaceTurnService.supported)
+                    Positioned(
+                      top:
+                          MediaQuery.paddingOf(context).top +
+                          (_chromeVisible &&
+                                  !state.performanceMode &&
+                                  !state.overlayEditing
+                              ? 104
+                              : 8),
+                      right: state.performanceMode ? 64 : 8,
+                      child: _WinkHud(
+                        service: ref.watch(faceTurnServiceProvider),
+                      ),
+                    ),
                   if (state.performanceMode)
                     Positioned(
                       top: MediaQuery.paddingOf(context).top + 8,
@@ -688,6 +780,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                 ],
               ),
             ),
+          ),
         );
       },
     );
@@ -739,10 +832,91 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       panEnabled: !state.overlayEditing,
     );
   }
+}
 
+/// 윙크 넘김 상태 표시. 반투명 알약 안에 두 눈을 그린다.
+///
+/// 얼굴이 안 잡히면 회색, 두 눈이 보이면 초록, 한쪽을 감는 중이면 그 눈이
+/// 감긴 모양으로 바뀌며 노랑, 넘기면 잠깐 파랑이다. 눈은 사용자 기준이라
+/// 오른눈(화면 오른쪽 눈)을 감으면 다음 장이다.
+class _WinkHud extends StatelessWidget {
+  const _WinkHud({required this.service});
+
+  final FaceTurnService service;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: service,
+      builder: (context, _) {
+        if (!service.running) return const SizedBox.shrink();
+        final phase = service.phase;
+        final scheme = Theme.of(context).colorScheme;
+
+        final (
+          Color color,
+          bool leftClosed,
+          bool rightClosed,
+          String? label,
+        ) = switch (phase) {
+          WinkPhase.noFace => (Colors.grey, false, false, tr('얼굴 없음')),
+          WinkPhase.eyesOpen => (Colors.green, false, false, null),
+          WinkPhase.closingNext => (Colors.amber, false, true, tr('다음')),
+          WinkPhase.closingPrevious => (Colors.amber, true, false, tr('이전')),
+          WinkPhase.fired => (scheme.primary, false, false, tr('넘김')),
+        };
+
+        Widget eye(bool closed) => Icon(
+          closed ? Icons.visibility_off : Icons.visibility,
+          size: 20,
+          color: Colors.white,
+        );
+
+        return IgnorePointer(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                eye(leftClosed),
+                const SizedBox(width: 6),
+                eye(rightClosed),
+                if (label != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 enum _TapZone { firstPage, previous, next, center }
+
+/// 페이지를 넘기는 손. 펜은 뺀다.
+///
+/// S펜은 애플 펜슬과 달리 필기 모드가 아닐 때도 화면에 닿는 족족 탭·끌기로
+/// 들어와, 악보를 가리키거나 메모하려다 장이 넘어갔다. 펜은 쓰고 가리키는
+/// 것이고 넘기는 것은 손가락이다.
+const _fingerDevices = {
+  PointerDeviceKind.touch,
+  PointerDeviceKind.mouse,
+  PointerDeviceKind.trackpad,
+};
 
 class _TapZones extends StatelessWidget {
   const _TapZones({required this.onTap, this.onLongPress});
@@ -771,6 +945,7 @@ class _TapZones extends StatelessWidget {
                 label: tr('이전 페이지'),
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
+                  supportedDevices: _fingerDevices,
                   onTap: () => onTap(_TapZone.previous),
                   onLongPressStart: onLongPress == null
                       ? null
@@ -788,6 +963,7 @@ class _TapZones extends StatelessWidget {
                 label: tr('다음 페이지'),
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
+                  supportedDevices: _fingerDevices,
                   onTap: () => onTap(_TapZone.next),
                   onLongPressStart: onLongPress == null
                       ? null
@@ -805,6 +981,7 @@ class _TapZones extends StatelessWidget {
                 label: tr('메뉴 보이기/숨기기'),
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
+                  supportedDevices: _fingerDevices,
                   onTap: () => onTap(_TapZone.center),
                   onLongPressStart: onLongPress == null
                       ? null
@@ -820,6 +997,7 @@ class _TapZones extends StatelessWidget {
               height: 64,
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
+                supportedDevices: _fingerDevices,
                 onDoubleTap: () => onTap(_TapZone.firstPage),
               ),
             ),
@@ -906,9 +1084,9 @@ class _PageSlider extends StatelessWidget {
       color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
       child: Slider(
         value: state.pageIndex.toDouble().clamp(
-              0,
-              (state.pageCount - 1).toDouble(),
-            ),
+          0,
+          (state.pageCount - 1).toDouble(),
+        ),
         max: (state.pageCount - 1).toDouble(),
         divisions: state.pageCount - 1,
         label: tr('{0}쪽', [state.pageIndex + 1]),
@@ -935,10 +1113,9 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               tr('악보를 열지 못했습니다'),
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(color: Colors.white),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Colors.white),
             ),
             const SizedBox(height: 6),
             Text(
@@ -980,7 +1157,10 @@ class _JumpTargetDialogState extends State<_JumpTargetDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(tr('{0}쪽', [_target]), style: Theme.of(context).textTheme.headlineSmall),
+          Text(
+            tr('{0}쪽', [_target]),
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
           Slider(
             value: _target.toDouble().clamp(1, max.toDouble()),
             min: 1,
@@ -996,7 +1176,9 @@ class _JumpTargetDialogState extends State<_JumpTargetDialog> {
                 icon: const Icon(Icons.remove),
               ),
               IconButton(
-                onPressed: _target < max ? () => setState(() => _target++) : null,
+                onPressed: _target < max
+                    ? () => setState(() => _target++)
+                    : null,
                 icon: const Icon(Icons.add),
               ),
             ],
@@ -1004,7 +1186,10 @@ class _JumpTargetDialogState extends State<_JumpTargetDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('취소'))),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(tr('취소')),
+        ),
         FilledButton(
           onPressed: () => Navigator.pop(context, _target),
           child: Text(tr('놓기')),
