@@ -41,9 +41,13 @@ class SceneDelegate: FlutterSceneDelegate {
     let accessed = url.startAccessingSecurityScopedResource()
     defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
-    let target = FileManager.default.temporaryDirectory
-      .appendingPathComponent("openin-\(Int(Date().timeIntervalSince1970))-\(url.lastPathComponent)")
+    // 파일명이 그대로 곡 제목이 된다. 겹침은 파일명 앞에 붙이지 말고
+    // 폴더를 따로 파서 피한다. "openin-1732..." 가 제목에 섞이면 안 된다.
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("openin/\(Int(Date().timeIntervalSince1970))", isDirectory: true)
+    let target = folder.appendingPathComponent(url.lastPathComponent)
     do {
+      try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
       try? FileManager.default.removeItem(at: target)
       try FileManager.default.copyItem(at: url, to: target)
     } catch {
