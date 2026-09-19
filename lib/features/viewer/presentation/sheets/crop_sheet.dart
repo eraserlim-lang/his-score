@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/db/database.dart';
 import '../../../../core/db/score_dao.dart';
+import '../../../../core/layout/floating_window.dart';
 import '../../data/score_session.dart';
 import '../widgets/score_page_view.dart';
 import '../../../../core/i18n/tr.dart';
@@ -21,26 +22,82 @@ Future<bool> showCropSheet(
   BuildContext context, {
   required ScoreSession session,
   required ViewPage current,
+
+  /// 떠 있는 창으로 옮긴 뒤 저장했을 때 부른다. 그때는 시트가 이미 닫혀
+  /// 있어 돌려주는 값으로는 알릴 수 없다.
+  required VoidCallback onSaved,
 }) async {
-  final saved = await showModalBottomSheet<bool>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    // 페이지 위에서 위아래로 끄는 손가락을 시트가 가로채면 안 된다.
-    enableDrag: false,
-    builder: (context) => FractionallySizedBox(
-      heightFactor: 0.92,
-      child: _CropBody(session: session, current: current),
+  final host = context;
+  // 여백을 손가락으로 맞추려면 페이지가 커야 한다. 시트로 열면 화면 일부만
+  // 쓰게 되어 잘라낼 자리를 눈으로 가늠하기 어렵다.
+  final saved = await Navigator.of(context).push<bool>(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (routeContext) => Scaffold(
+        body: SafeArea(
+          child: _CropBody(
+            session: session,
+            current: current,
+            onDone: (saved) => Navigator.pop(routeContext, saved),
+            onPopOut: () {
+              Navigator.pop(routeContext, false);
+              showCropWindow(
+                host,
+                session: session,
+                current: current,
+                onSaved: onSaved,
+              );
+            },
+          ),
+        ),
+      ),
     ),
   );
   return saved == true;
 }
 
+/// 같은 조정 화면을 악보 위에 떠 있는 창으로 연다.
+/// 시트와 달리 악보가 가려지지 않아 고친 결과를 바로 견줄 수 있다.
+void showCropWindow(
+  BuildContext context, {
+  required ScoreSession session,
+  required ViewPage current,
+  required VoidCallback onSaved,
+}) {
+  showFloatingWindow(
+    context: context,
+    title: tr('페이지 조정'),
+    initialSize: const Size(520, 560),
+    // 안에서 Expanded 로 높이를 나눠 쓴다.
+    scrollable: false,
+    builder: (context, close) => _CropBody(
+      session: session,
+      current: current,
+      onDone: (saved) {
+        close();
+        if (saved) onSaved();
+      },
+    ),
+  );
+}
+
 class _CropBody extends ConsumerStatefulWidget {
-  const _CropBody({required this.session, required this.current});
+  const _CropBody({
+    required this.session,
+    required this.current,
+    required this.onDone,
+    this.onPopOut,
+  });
 
   final ScoreSession session;
   final ViewPage current;
+
+  /// 끝났을 때 부른다. 참이면 저장했다는 뜻이다.
+  /// 시트냐 떠 있는 창이냐에 따라 닫는 방법이 달라 바깥에 맡긴다.
+  final void Function(bool saved) onDone;
+
+  /// 떠 있는 창으로 옮기기. 창에서는 다시 옮길 곳이 없어 null 이다.
+  final VoidCallback? onPopOut;
 
   @override
   ConsumerState<_CropBody> createState() => _CropBodyState();
@@ -49,55 +106,148 @@ class _CropBody extends ConsumerStatefulWidget {
 class _CropBodyState extends ConsumerState<_CropBody> {
   static const _maxTilt = 15.0;
 
-  bool _allPages = true;
+  bool _allPages = false;
   late double _left, _top, _right, _bottom;
+
+  /// 지금 보고 있는 페이지. 시트 안에서 앞뒤로 옮겨 다닐 수 있다.
+  late ViewPage _current;
+
+  /// 옮겨 다닐 수 있는 페이지들. 여백은 곡 단위라 같은 곡 안에서만 다닌다.
+  late List<ViewPage> _pages;
+
+  /// "이 페이지" 로 고쳐 둔 것들(scorePageId 별). 페이지를 옮겨도 들고 있다가
+  /// 저장할 때 한꺼번에 쓴다. 그러지 않으면 옮기는 순간 조용히 사라진다.
+  final _edits = <String, _PageEdit>{};
+
+  /// 이미 DB 에 쓴 것이 있는지. 초기화는 바로 쓰기 때문에, 그 뒤 취소로
+  /// 닫아도 세션을 다시 열어야 화면에 반영된다.
+  bool _wrote = false;
 
   /// 90° 단위 회전과 그 위에 얹는 미세 기울기(-15° ~ 15°).
   late double _quarter, _tilt;
 
   double get _rotation => (_quarter + _tilt) % 360;
 
-  Score get _score => widget.session.scoreOf(widget.current);
+  Score get _score => widget.session.scoreOf(_current);
+
+  int get _at => _pages.indexWhere((p) => p.index == _current.index);
 
   @override
   void initState() {
     super.initState();
-    _loadFor(all: true);
+    _current = widget.current;
+    _pages = widget.session.pages
+        .where((p) => p.scoreId == widget.current.scoreId)
+        .toList(growable: false);
+    _loadFor(all: _allPages);
   }
 
   void _loadFor({required bool all}) {
-    final score = _score;
-    final crop = widget.current.crop;
     if (all) {
+      final score = _score;
       _left = score.cropLeft;
       _top = score.cropTop;
       _right = score.cropRight;
       _bottom = score.cropBottom;
       _quarter = 0;
       _tilt = 0;
-    } else {
-      _left = crop.left;
-      _top = crop.top;
-      _right = 1 - crop.right;
-      _bottom = 1 - crop.bottom;
-      final rotation = widget.current.rotation;
-      _quarter = (rotation / 90).round() * 90.0;
-      _tilt = (rotation - _quarter).clamp(-_maxTilt, _maxTilt);
+      return;
     }
+
+    final edit = _edits[_current.scorePageId];
+    if (edit != null) {
+      _left = edit.left;
+      _top = edit.top;
+      _right = edit.right;
+      _bottom = edit.bottom;
+      _quarter = edit.quarter;
+      _tilt = edit.tilt;
+      return;
+    }
+
+    final crop = _current.crop;
+    _left = crop.left;
+    _top = crop.top;
+    _right = 1 - crop.right;
+    _bottom = 1 - crop.bottom;
+    final rotation = _current.rotation;
+    _quarter = (rotation / 90).round() * 90.0;
+    _tilt = (rotation - _quarter).clamp(-_maxTilt, _maxTilt);
+  }
+
+  /// 지금 페이지에서 고친 값을 들고 있는다. 페이지를 옮기거나 저장하기 전에 부른다.
+  void _stash() {
+    _edits[_current.scorePageId] = _PageEdit(
+      left: _left,
+      top: _top,
+      right: _right,
+      bottom: _bottom,
+      quarter: _quarter,
+      tilt: _tilt,
+    );
+  }
+
+  /// 앞뒤 페이지로 옮긴다. "모든 페이지" 에서는 값이 곡 전체 것이라 그대로 두고
+  /// 밑그림만 바꾼다. 곡 여백이 다른 쪽에서 어떻게 보이는지 확인할 수 있다.
+  void _moveBy(int delta) {
+    final next = _at + delta;
+    if (_at < 0 || next < 0 || next >= _pages.length) return;
+    if (!_allPages) _stash();
+    setState(() {
+      _current = _pages[next];
+      _loadFor(all: _allPages);
+    });
   }
 
   ViewPage get _preview => ViewPage(
-        index: widget.current.index,
-        scoreId: widget.current.scoreId,
-        scorePageId: widget.current.scorePageId,
-        docIndex: widget.current.docIndex,
-        sourcePageNumber: widget.current.sourcePageNumber,
-        crop: ScoreSession.cropRect(left: _left, top: _top, right: _right, bottom: _bottom),
-        rotation: _rotation,
-        sourceSize: widget.current.sourceSize,
-      );
+    index: _current.index,
+    scoreId: _current.scoreId,
+    scorePageId: _current.scorePageId,
+    docIndex: _current.docIndex,
+    sourcePageNumber: _current.sourcePageNumber,
+    crop: ScoreSession.cropRect(
+      left: _left,
+      top: _top,
+      right: _right,
+      bottom: _bottom,
+    ),
+    rotation: _rotation,
+    sourceSize: _current.sourceSize,
+  );
+
+  /// "모든 페이지" 는 곡 전체를 건드린다. 한 장만 손보려다 실수로 곡을
+  /// 통째로 바꾸는 일이 잦아 저장 직전에 한 번 묻는다.
+  Future<bool> _confirmAllPages() async {
+    final count = widget.session.pages
+        .where((p) => p.scoreId == widget.current.scoreId)
+        .length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(tr('모든 페이지를 바꿀까요?')),
+        content: Text(
+          tr('이 곡 {0}쪽 전체의 여백이 지금 값으로 바뀝니다. 따로 조정해 둔 페이지는 제 값을 지킵니다.', [count]),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(tr('취소')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(tr('모든 페이지에 적용')),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
 
   Future<void> _save() async {
+    if (_allPages) {
+      final ok = await _confirmAllPages();
+      if (!ok || !mounted) return;
+    }
     final dao = ref.read(scoreDaoProvider);
     if (_allPages) {
       await dao.updateScore(
@@ -110,32 +260,61 @@ class _CropBodyState extends ConsumerState<_CropBody> {
         ),
       );
     } else {
+      _stash();
+      await _writeEdits(dao);
+    }
+    if (mounted) widget.onDone(true);
+  }
+
+  /// 옮겨 다니며 고쳐 둔 페이지를 전부 쓴다.
+  Future<void> _writeEdits(ScoreDao dao) async {
+    for (final entry in _edits.entries) {
+      final e = entry.value;
       await dao.updatePage(
-        widget.current.scorePageId,
+        entry.key,
         ScorePagesCompanion(
-          cropLeft: Value(_left),
-          cropTop: Value(_top),
-          cropRight: Value(_right),
-          cropBottom: Value(_bottom),
-          rotation: Value(_rotation),
+          cropLeft: Value(e.left),
+          cropTop: Value(e.top),
+          cropRight: Value(e.right),
+          cropBottom: Value(e.bottom),
+          rotation: Value(e.rotation),
         ),
       );
     }
-    if (mounted) Navigator.pop(context, true);
   }
 
+  /// 이 페이지만 곡 값으로 되돌린다.
+  ///
+  /// 창은 닫지 않는다. 여러 쪽을 오가며 손보는 중에 한 쪽을 되돌렸다고
+  /// 화면이 사라지면 하던 일이 끊긴다.
   Future<void> _resetPage() async {
-    await ref.read(scoreDaoProvider).updatePage(
-          widget.current.scorePageId,
-          const ScorePagesCompanion(
-            cropLeft: Value(null),
-            cropTop: Value(null),
-            cropRight: Value(null),
-            cropBottom: Value(null),
-            rotation: Value(0),
-          ),
-        );
-    if (mounted) Navigator.pop(context, true);
+    final dao = ref.read(scoreDaoProvider);
+    // 이 페이지는 되돌리지만, 옮겨 다니며 고쳐 둔 다른 페이지까지 버리면 안 된다.
+    _edits.remove(_current.scorePageId);
+    await _writeEdits(dao);
+    _edits.clear();
+    await dao.updatePage(
+      _current.scorePageId,
+      const ScorePagesCompanion(
+        cropLeft: Value(null),
+        cropTop: Value(null),
+        cropRight: Value(null),
+        cropBottom: Value(null),
+        rotation: Value(0),
+      ),
+    );
+    if (!mounted) return;
+    _wrote = true;
+    // 되돌린 뒤 보이는 값은 곡 전체 여백이다. null 이 그 뜻이다.
+    setState(() {
+      final score = _score;
+      _left = score.cropLeft;
+      _top = score.cropTop;
+      _right = score.cropRight;
+      _bottom = score.cropBottom;
+      _quarter = 0;
+      _tilt = 0;
+    });
   }
 
   @override
@@ -146,8 +325,25 @@ class _CropBodyState extends ConsumerState<_CropBody> {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
           child: Row(
             children: [
-              Text(tr('페이지 조정'), style: Theme.of(context).textTheme.titleLarge),
-              Spacer(),
+              Expanded(
+                child: Text(
+                  tr('페이지 조정'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (widget.onPopOut != null)
+                IconButton(
+                  onPressed: widget.onPopOut,
+                  icon: const Icon(Icons.open_in_new),
+                  tooltip: tr('별도 창으로 띄우기'),
+                ),
+              // 이동은 악보 양옆의 큰 버튼으로 한다. 여기는 자리만 알린다.
+              Text(
+                '${_at + 1} / ${_pages.length}',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(width: 12),
               SegmentedButton<bool>(
                 segments: [
                   ButtonSegment(value: true, label: Text(tr('모든 페이지'))),
@@ -155,6 +351,8 @@ class _CropBodyState extends ConsumerState<_CropBody> {
                 ],
                 selected: {_allPages},
                 onSelectionChanged: (s) => setState(() {
+                  // 범위를 바꾸기 전에 이 페이지에서 고친 것을 챙긴다.
+                  if (!_allPages) _stash();
                   _allPages = s.first;
                   _loadFor(all: _allPages);
                 }),
@@ -164,27 +362,43 @@ class _CropBodyState extends ConsumerState<_CropBody> {
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: _CropEditor(
-              session: widget.session,
-              page: widget.current,
-              preview: _preview,
-              left: _left,
-              top: _top,
-              right: _right,
-              bottom: _bottom,
-              tilt: _tilt,
-              maxTilt: _maxTilt,
-              tiltEnabled: !_allPages,
-              onCropChanged: (l, t, r, b) => setState(() {
-                _left = l;
-                _top = t;
-                _right = r;
-                _bottom = b;
-              }),
-              onTiltChanged: (v) => setState(() => _tilt = v),
-            ),
+          child: Row(
+            children: [
+              _SideNav(
+                icon: Icons.chevron_left,
+                tooltip: tr('이전 페이지'),
+                onPressed: _at > 0 ? () => _moveBy(-1) : null,
+              ),
+              Expanded(
+                child: _CropEditor(
+                  key: ValueKey(_current.scorePageId),
+                  session: widget.session,
+                  page: _current,
+                  preview: _preview,
+                  left: _left,
+                  top: _top,
+                  right: _right,
+                  bottom: _bottom,
+                  tilt: _tilt,
+                  maxTilt: _maxTilt,
+                  tiltEnabled: !_allPages,
+                  onCropChanged: (l, t, r, b) => setState(() {
+                    _left = l;
+                    _top = t;
+                    _right = r;
+                    _bottom = b;
+                  }),
+                  onTiltChanged: (v) => setState(() => _tilt = v),
+                ),
+              ),
+              _SideNav(
+                icon: Icons.chevron_right,
+                tooltip: tr('다음 페이지'),
+                onPressed: _at >= 0 && _at < _pages.length - 1
+                    ? () => _moveBy(1)
+                    : null,
+              ),
+            ],
           ),
         ),
         Padding(
@@ -195,9 +409,18 @@ class _CropBodyState extends ConsumerState<_CropBody> {
               Text(
                 _allPages
                     ? tr('변과 모서리를 끌어 여백을 맞춥니다. 두 손가락을 벌려 확대합니다.')
-                    : tr('변과 모서리를 끌어 여백을 맞춥니다. 두 손가락을 벌려 확대하고, 돌려서 기울기를 바로잡습니다.'),
+                    : tr(
+                        '변과 모서리를 끌어 여백을 맞춥니다. 두 손가락을 벌려 확대하고, 돌려서 기울기를 바로잡습니다.',
+                      ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              if (!_allPages && _stagedCount > 0)
+                Text(
+                  tr('다른 쪽에서 고쳐 둔 {0}쪽도 함께 저장합니다.', [_stagedCount]),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
               const SizedBox(height: 4),
               Row(
                 children: [
@@ -213,10 +436,13 @@ class _CropBodyState extends ConsumerState<_CropBody> {
                       avatar: const Icon(Icons.straighten, size: 18),
                       label: Text('${tr('기울기')} ${_tilt.toStringAsFixed(1)}°'),
                       tooltip: tr('기울기 0°로'),
-                      onPressed: _tilt == 0 ? null : () => setState(() => _tilt = 0),
+                      onPressed: _tilt == 0
+                          ? null
+                          : () => setState(() => _tilt = 0),
                     ),
                     IconButton(
-                      onPressed: () => setState(() => _quarter = (_quarter + 90) % 360),
+                      onPressed: () =>
+                          setState(() => _quarter = (_quarter + 90) % 360),
                       icon: const Icon(Icons.rotate_right),
                       tooltip: tr('90° 돌리기'),
                     ),
@@ -227,7 +453,10 @@ class _CropBodyState extends ConsumerState<_CropBody> {
               Row(
                 children: [
                   if (!_allPages)
-                    TextButton(onPressed: _resetPage, child: Text(tr('이 페이지 초기화')))
+                    TextButton(
+                      onPressed: _resetPage,
+                      child: Text(tr('이 페이지 초기화')),
+                    )
                   else
                     TextButton(
                       onPressed: () => setState(() {
@@ -237,7 +466,8 @@ class _CropBodyState extends ConsumerState<_CropBody> {
                     ),
                   const Spacer(),
                   TextButton(
-                    onPressed: () => Navigator.pop(context, false),
+                    // 초기화로 이미 쓴 것이 있으면 닫을 때 다시 읽어야 한다.
+                    onPressed: () => widget.onDone(_wrote),
                     child: Text(tr('취소')),
                   ),
                   const SizedBox(width: 8),
@@ -251,7 +481,69 @@ class _CropBodyState extends ConsumerState<_CropBody> {
     );
   }
 
+  /// 지금 페이지 말고 따로 고쳐 둔 쪽수.
+  int get _stagedCount =>
+      _edits.keys.where((id) => id != _current.scorePageId).length;
+
   String _percent(double value) => '${(value * 100).round()}%';
+}
+
+/// "이 페이지" 로 고쳐 둔 한 쪽의 값. 저장을 누를 때까지 들고만 있는다.
+class _PageEdit {
+  const _PageEdit({
+    required this.left,
+    required this.top,
+    required this.right,
+    required this.bottom,
+    required this.quarter,
+    required this.tilt,
+  });
+
+  final double left, top, right, bottom;
+  final double quarter, tilt;
+
+  double get rotation => (quarter + tilt) % 360;
+}
+
+/// 악보 양옆에 세로로 길게 붙는 페이지 이동 버튼.
+///
+/// 페이지를 오가며 여백을 맞추는 일이 많아 손이 가는 자리에 크게 둔다.
+/// 편집 영역 밖이라 여백을 끄는 손가락과 겹치지 않는다.
+class _SideNav extends StatelessWidget {
+  const _SideNav({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = onPressed != null;
+
+    // 바탕을 깔지 않는다. 칸이 나뉘어 보이면 악보와 따로 노는 띠가 된다.
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        child: SizedBox(
+          width: 64,
+          height: double.infinity,
+          child: Icon(
+            icon,
+            size: 40,
+            color: enabled
+                ? scheme.onSurfaceVariant
+                : scheme.onSurfaceVariant.withValues(alpha: 0.25),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// 페이지 위에서 손가락으로 여백과 기울기를 고치는 편집 영역.
@@ -262,6 +554,7 @@ class _CropBodyState extends ConsumerState<_CropBody> {
 /// 확대하려다 기울기가 틀어지는 일을 막기 위해서다.
 class _CropEditor extends StatefulWidget {
   const _CropEditor({
+    super.key,
     required this.session,
     required this.page,
     required this.preview,
@@ -288,7 +581,8 @@ class _CropEditor extends StatefulWidget {
   final double tilt;
   final double maxTilt;
   final bool tiltEnabled;
-  final void Function(double left, double top, double right, double bottom) onCropChanged;
+  final void Function(double left, double top, double right, double bottom)
+  onCropChanged;
   final ValueChanged<double> onTiltChanged;
 
   @override
@@ -312,7 +606,10 @@ class _CropEditorState extends State<_CropEditor> {
   Offset _offset = Offset.zero;
 
   _Grab _grab = _Grab.none;
-  bool _grabLeft = false, _grabTop = false, _grabRight = false, _grabBottom = false;
+  bool _grabLeft = false,
+      _grabTop = false,
+      _grabRight = false,
+      _grabBottom = false;
   Offset _startFocal = Offset.zero;
   Offset _lastFocal = Offset.zero;
   late double _startLeft, _startTop, _startRight, _startBottom;
@@ -326,11 +623,11 @@ class _CropEditorState extends State<_CropEditor> {
   Offset _toPage(Offset q) => (q - _center - _offset) / _scale + _center;
 
   Rect get _cropBox => Rect.fromLTRB(
-        _pageBox.left + _pageBox.width * widget.left,
-        _pageBox.top + _pageBox.height * widget.top,
-        _pageBox.right - _pageBox.width * widget.right,
-        _pageBox.bottom - _pageBox.height * widget.bottom,
-      );
+    _pageBox.left + _pageBox.width * widget.left,
+    _pageBox.top + _pageBox.height * widget.top,
+    _pageBox.right - _pageBox.width * widget.right,
+    _pageBox.bottom - _pageBox.height * widget.bottom,
+  );
 
   Rect get _cropOnScreen {
     final box = _cropBox;
@@ -483,7 +780,9 @@ class _CropEditorState extends State<_CropEditor> {
           math.max(1, _area.height - margin * 2),
         );
         final source = widget.page.sourceSize;
-        final aspect = source.isEmpty ? 1 / math.sqrt2 : source.width / source.height;
+        final aspect = source.isEmpty
+            ? 1 / math.sqrt2
+            : source.width / source.height;
         final fitted = room.width / room.height > aspect
             ? Size(room.height * aspect, room.height)
             : Size(room.width, room.width / aspect);
@@ -531,7 +830,10 @@ class _CropEditorState extends State<_CropEditor> {
                         // 잘려 나갈 부분은 어둡게, 남는 부분은 결과 그대로 보여준다.
                         Positioned.fromRect(
                           rect: _pageBox,
-                          child: ScorePageView(session: widget.session, page: whole),
+                          child: ScorePageView(
+                            session: widget.session,
+                            page: whole,
+                          ),
                         ),
                         Positioned.fromRect(
                           rect: _pageBox,
@@ -621,10 +923,26 @@ class _CropFramePainter extends CustomPainter {
     final reachX = math.min(22.0, frame.width / 6);
     final reachY = math.min(22.0, frame.height / 6);
     final c = frame.center;
-    canvas.drawLine(Offset(frame.left, c.dy - reachY), Offset(frame.left, c.dy + reachY), grip(activeLeft));
-    canvas.drawLine(Offset(frame.right, c.dy - reachY), Offset(frame.right, c.dy + reachY), grip(activeRight));
-    canvas.drawLine(Offset(c.dx - reachX, frame.top), Offset(c.dx + reachX, frame.top), grip(activeTop));
-    canvas.drawLine(Offset(c.dx - reachX, frame.bottom), Offset(c.dx + reachX, frame.bottom), grip(activeBottom));
+    canvas.drawLine(
+      Offset(frame.left, c.dy - reachY),
+      Offset(frame.left, c.dy + reachY),
+      grip(activeLeft),
+    );
+    canvas.drawLine(
+      Offset(frame.right, c.dy - reachY),
+      Offset(frame.right, c.dy + reachY),
+      grip(activeRight),
+    );
+    canvas.drawLine(
+      Offset(c.dx - reachX, frame.top),
+      Offset(c.dx + reachX, frame.top),
+      grip(activeTop),
+    );
+    canvas.drawLine(
+      Offset(c.dx - reachX, frame.bottom),
+      Offset(c.dx + reachX, frame.bottom),
+      grip(activeBottom),
+    );
 
     // 모서리 꺾쇠.
     void corner(Offset at, double sx, double sy, bool active) {
