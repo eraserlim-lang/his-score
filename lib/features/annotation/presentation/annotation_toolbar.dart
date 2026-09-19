@@ -56,12 +56,15 @@ class AnnotationToolbar extends StatelessWidget {
                   ),
                   const VerticalDivider(indent: 12, endIndent: 12),
                   for (final preset in PenPreset.values)
-                    _ToolButton(
-                      icon: _presetIcon(preset),
-                      label: tr(preset.label),
-                      selected: tools.tool == InkTool.pen && tools.preset == preset,
-                      onTap: () => tools.setPreset(preset),
-                      onLongPress: () => _showWidth(context),
+                    // Builder 로 감싸야 팝업을 이 버튼 자리에 띄울 수 있다.
+                    Builder(
+                      builder: (buttonContext) => _ToolButton(
+                        icon: _presetIcon(preset),
+                        label: tr(preset.label),
+                        selected: tools.tool == InkTool.pen && tools.preset == preset,
+                        onTap: () => tools.setPreset(preset),
+                        onLongPress: () => _showPenOptions(buttonContext),
+                      ),
                     ),
                   _ToolButton(
                     icon: Icons.auto_fix_normal,
@@ -158,21 +161,44 @@ class AnnotationToolbar extends StatelessWidget {
         PenPreset.brush => Icons.brush,
       };
 
-  void _showWidth(BuildContext context) {
-    showModalBottomSheet<void>(
+  /// 펜 옵션을 그 버튼 자리에 팝업으로 띄운다.
+  ///
+  /// 바닥 시트로 열면 악보 아래쪽이 가려져 방금 그은 획을 보면서 굵기나
+  /// 색을 고를 수 없었다. 팝업은 버튼 옆에만 떠서 획이 보인다.
+  Future<void> _showPenOptions(BuildContext context) async {
+    final button = context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (button == null || overlay == null) return;
+
+    final corner = button.localToGlobal(Offset.zero, ancestor: overlay);
+    // 막대가 아래에 있으면 위로, 위에 있으면 아래로 편다.
+    final position = tools.toolbarAtBottom
+        ? RelativeRect.fromLTRB(
+            corner.dx,
+            0,
+            overlay.size.width - corner.dx - button.size.width,
+            overlay.size.height - corner.dy,
+          )
+        : RelativeRect.fromLTRB(
+            corner.dx,
+            corner.dy + button.size.height,
+            overlay.size.width - corner.dx - button.size.width,
+            0,
+          );
+
+    await showMenu<void>(
       context: context,
-      builder: (context) => _SliderSheet(
-        title: tr('펜 굵기'),
-        listenable: tools,
-        value: () => tools.width,
-        min: 0.4,
-        max: 4,
-        onChanged: tools.setWidth,
-        preview: (v) => CustomPaint(
-          size: const Size(200, 40),
-          painter: _WidthPreview(tools.preset, tools.color, v),
+      position: position,
+      constraints: const BoxConstraints(minWidth: 280, maxWidth: 320),
+      items: [
+        PopupMenuItem<void>(
+          // 팝업을 닫지 않고 계속 고칠 수 있어야 한다.
+          enabled: false,
+          padding: EdgeInsets.zero,
+          child: _PenOptions(tools: tools),
         ),
-      ),
+      ],
     );
   }
 
@@ -266,6 +292,57 @@ class AnnotationToolbar extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 펜 옵션 팝업 속 내용. 굵기와 색을 한자리에서 고친다.
+class _PenOptions extends StatelessWidget {
+  const _PenOptions({required this.tools});
+
+  final AnnotationToolState tools;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: tools,
+      builder: (context, _) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('펜 굵기'), style: Theme.of(context).textTheme.labelLarge),
+              CustomPaint(
+                size: const Size(double.infinity, 36),
+                painter: _WidthPreview(tools.preset, tools.color, tools.width),
+              ),
+              Slider(
+                value: tools.width,
+                min: 0.4,
+                max: 4,
+                onChanged: tools.setWidth,
+              ),
+              const SizedBox(height: 4),
+              Text(tr('색'), style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final color in ViewerColors.inkPalette)
+                    _ColorDot(
+                      color: color,
+                      selected: tools.color == color,
+                      onTap: () => tools.setColor(color),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

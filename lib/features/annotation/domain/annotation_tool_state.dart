@@ -10,7 +10,8 @@ enum InkTool { pen, eraser, stamp, text, shape, select }
 class AnnotationToolState extends ChangeNotifier {
   InkTool _tool = InkTool.pen;
   PenPreset _preset = PenPreset.pen;
-  Color _color = ViewerColors.inkColors.first;
+  /// 악보 위 필기는 인쇄된 음표와 섞이지 않아야 한다. 빨강이 가장 눈에 띈다.
+  Color _color = ViewerColors.inkDefault;
   double _width = 1.0;
   double _eraserRadius = 14;
   String _stampId = 'f1';
