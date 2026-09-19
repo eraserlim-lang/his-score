@@ -47,9 +47,10 @@ abstract final class AppTheme {
 
 /// 악보 보기 화면 전용 색.
 abstract final class ViewerColors {
-  /// 악보 뒤 배경. 눈부심을 줄이되 흰 종이와 구분되게 한다.
+  /// 악보 뒤 배경. 어두운 테마는 눈부심을 줄이는 짙은 회색, 밝은 테마는
+  /// 종이와 같은 흰색이라 페이지 경계가 사라지고 화면 전체가 악보가 된다.
   static const canvas = Color(0xFF2A2C31);
-  static const canvasLight = Color(0xFFE8E9EC);
+  static const canvasLight = Color(0xFFFFFFFF);
 
   /// 지금 테마에 맞는 악보 배경.
   static Color canvasOf(Brightness brightness) =>
