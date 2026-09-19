@@ -29,12 +29,12 @@ class InkTransform {
   double get scale => scaleOverride ?? size.width / crop.width / 1000;
 
   Offset toWidget(double nx, double ny) => _rotate(
-        Offset(
-          (nx - crop.left) / crop.width * size.width,
-          (ny - crop.top) / crop.height * size.height,
-        ),
-        rotation,
-      );
+    Offset(
+      (nx - crop.left) / crop.width * size.width,
+      (ny - crop.top) / crop.height * size.height,
+    ),
+    rotation,
+  );
 
   Offset toNormalized(Offset widget) {
     final w = _rotate(widget, -rotation);
@@ -126,7 +126,9 @@ class InkPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeCap = preset == PenPreset.marker ? StrokeCap.square : StrokeCap.round
+      ..strokeCap = preset == PenPreset.marker
+          ? StrokeCap.square
+          : StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..isAntiAlias = true;
 
@@ -219,11 +221,19 @@ class InkPainter extends CustomPainter {
     }
   }
 
-  static void _arrowHead(Canvas canvas, Offset from, Offset to, Paint paint, double size) {
+  static void _arrowHead(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    Paint paint,
+    double size,
+  ) {
     final angle = math.atan2(to.dy - from.dy, to.dx - from.dx);
     const spread = math.pi / 7;
-    final p1 = to - Offset(math.cos(angle - spread), math.sin(angle - spread)) * size;
-    final p2 = to - Offset(math.cos(angle + spread), math.sin(angle + spread)) * size;
+    final p1 =
+        to - Offset(math.cos(angle - spread), math.sin(angle - spread)) * size;
+    final p2 =
+        to - Offset(math.cos(angle + spread), math.sin(angle + spread)) * size;
     canvas.drawLine(to, p1, paint);
     canvas.drawLine(to, p2, paint);
   }
@@ -233,20 +243,48 @@ class InkPainter extends CustomPainter {
     PlacedAnnotation item,
     InkTransform t, {
     bool selected = false,
+
+    /// 주면 글자가 이 폭을 넘지 않게 줄여 그린다. 팔레트의 네모 칸처럼
+    /// 자리가 정해진 곳에서 쓴다. 악보 위에 찍을 때는 주지 않는다.
+    double? maxWidth,
   }) {
     final center = t.toWidget(item.x, item.y);
     final base = (item.fontSize ?? 28) * item.scale * t.scale;
     Rect bounds;
 
     if (item.kind == PlacedKind.text) {
-      bounds = _paintText(canvas, item.value, center, base, item.color, italic: false);
+      bounds = _paintText(
+        canvas,
+        item.value,
+        center,
+        base,
+        item.color,
+        italic: false,
+        maxWidth: maxWidth,
+      );
     } else {
       final def = findStamp(item.value);
       if (def == null) {
-        bounds = _paintText(canvas, '?', center, base, item.color, italic: false);
+        bounds = _paintText(
+          canvas,
+          '?',
+          center,
+          base,
+          item.color,
+          italic: false,
+          maxWidth: maxWidth,
+        );
       } else if (def.glyph != null) {
-        bounds = _paintText(canvas, def.glyph!, center, base, item.color,
-            italic: def.italic, serif: true);
+        bounds = _paintText(
+          canvas,
+          def.glyph!,
+          center,
+          base,
+          item.color,
+          italic: def.italic,
+          serif: true,
+          maxWidth: maxWidth,
+        );
       } else {
         bounds = StampPainter.paint(canvas, def.id, center, base, item.color);
       }
@@ -271,13 +309,34 @@ class InkPainter extends CustomPainter {
     Color color, {
     required bool italic,
     bool serif = false,
+    double? maxWidth,
   }) {
+    // 먼저 한 번 재어 보고 넘치면 그만큼 줄인다. 'cresc.' 나 'Chorus' 처럼
+    // 긴 글자가 네모 칸 밖으로 삐져나오던 것을 막는다.
+    var size = fontSize;
+    if (maxWidth != null) {
+      final probe = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontStyle: italic ? FontStyle.italic : FontStyle.normal,
+            fontWeight: serif ? FontWeight.w600 : FontWeight.w500,
+            fontFamily: serif ? 'serif' : null,
+            height: 1.0,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      if (probe.width > maxWidth) size = fontSize * maxWidth / probe.width;
+    }
+
     final painter = TextPainter(
       text: TextSpan(
         text: text,
         style: TextStyle(
           color: color,
-          fontSize: fontSize,
+          fontSize: size,
           fontStyle: italic ? FontStyle.italic : FontStyle.normal,
           fontWeight: serif ? FontWeight.w600 : FontWeight.w500,
           fontFamily: serif ? 'serif' : null,
@@ -340,7 +399,11 @@ abstract final class StampPainter {
       case 'staccato':
         canvas.drawCircle(c, s * 0.12, fill);
       case 'tenuto':
-        canvas.drawLine(Offset(c.dx - r * 0.7, c.dy), Offset(c.dx + r * 0.7, c.dy), stroke);
+        canvas.drawLine(
+          Offset(c.dx - r * 0.7, c.dy),
+          Offset(c.dx + r * 0.7, c.dy),
+          stroke,
+        );
       case 'marcato':
         final path = Path()
           ..moveTo(c.dx - r * 0.6, c.dy + r * 0.5)
@@ -349,7 +412,10 @@ abstract final class StampPainter {
         canvas.drawPath(path, stroke);
       case 'fermata':
         canvas.drawArc(
-          Rect.fromCircle(center: Offset(c.dx, c.dy + r * 0.3), radius: r * 0.8),
+          Rect.fromCircle(
+            center: Offset(c.dx, c.dy + r * 0.3),
+            radius: r * 0.8,
+          ),
           math.pi,
           math.pi,
           false,
@@ -359,11 +425,24 @@ abstract final class StampPainter {
       case 'breath':
         final path = Path()
           ..moveTo(c.dx - r * 0.2, c.dy + r * 0.6)
-          ..quadraticBezierTo(c.dx + r * 0.3, c.dy, c.dx + r * 0.1, c.dy - r * 0.7);
+          ..quadraticBezierTo(
+            c.dx + r * 0.3,
+            c.dy,
+            c.dx + r * 0.1,
+            c.dy - r * 0.7,
+          );
         canvas.drawPath(path, stroke);
       case 'caesura':
-        canvas.drawLine(Offset(c.dx - r * 0.5, c.dy + r * 0.7), Offset(c.dx, c.dy - r * 0.7), stroke);
-        canvas.drawLine(Offset(c.dx, c.dy + r * 0.7), Offset(c.dx + r * 0.5, c.dy - r * 0.7), stroke);
+        canvas.drawLine(
+          Offset(c.dx - r * 0.5, c.dy + r * 0.7),
+          Offset(c.dx, c.dy - r * 0.7),
+          stroke,
+        );
+        canvas.drawLine(
+          Offset(c.dx, c.dy + r * 0.7),
+          Offset(c.dx + r * 0.5, c.dy - r * 0.7),
+          stroke,
+        );
       case 'mordent':
         final path = Path()..moveTo(c.dx - r * 0.9, c.dy);
         for (var i = 0; i < 4; i++) {
@@ -372,16 +451,41 @@ abstract final class StampPainter {
         }
         path.lineTo(c.dx + r * 0.9, c.dy);
         canvas.drawPath(path, stroke);
-        canvas.drawLine(Offset(c.dx, c.dy - r * 0.7), Offset(c.dx, c.dy + r * 0.7), stroke);
+        canvas.drawLine(
+          Offset(c.dx, c.dy - r * 0.7),
+          Offset(c.dx, c.dy + r * 0.7),
+          stroke,
+        );
       case 'turn':
         final path = Path()
           ..moveTo(c.dx - r * 0.9, c.dy + r * 0.3)
-          ..cubicTo(c.dx - r * 0.9, c.dy - r * 0.6, c.dx - r * 0.1, c.dy - r * 0.6, c.dx, c.dy)
-          ..cubicTo(c.dx + r * 0.1, c.dy + r * 0.6, c.dx + r * 0.9, c.dy + r * 0.6, c.dx + r * 0.9, c.dy - r * 0.3);
+          ..cubicTo(
+            c.dx - r * 0.9,
+            c.dy - r * 0.6,
+            c.dx - r * 0.1,
+            c.dy - r * 0.6,
+            c.dx,
+            c.dy,
+          )
+          ..cubicTo(
+            c.dx + r * 0.1,
+            c.dy + r * 0.6,
+            c.dx + r * 0.9,
+            c.dy + r * 0.6,
+            c.dx + r * 0.9,
+            c.dy - r * 0.3,
+          );
         canvas.drawPath(path, stroke);
       case 'downbow':
-        final rect = Rect.fromCenter(center: c, width: r * 1.2, height: r * 0.9);
-        canvas.drawRect(Rect.fromLTRB(rect.left, rect.top, rect.right, rect.top + r * 0.3), fill);
+        final rect = Rect.fromCenter(
+          center: c,
+          width: r * 1.2,
+          height: r * 0.9,
+        );
+        canvas.drawRect(
+          Rect.fromLTRB(rect.left, rect.top, rect.right, rect.top + r * 0.3),
+          fill,
+        );
         canvas.drawLine(rect.bottomLeft, rect.topLeft, stroke);
         canvas.drawLine(rect.bottomRight, rect.topRight, stroke);
       case 'upbow':
@@ -391,16 +495,166 @@ abstract final class StampPainter {
           ..lineTo(c.dx + r * 0.5, c.dy - r * 0.7);
         canvas.drawPath(path, stroke);
       case 'whole':
-        canvas.drawOval(Rect.fromCenter(center: c, width: r * 1.2, height: r * 0.8), stroke);
+        canvas.drawOval(
+          Rect.fromCenter(center: c, width: r * 1.2, height: r * 0.8),
+          stroke,
+        );
       case 'half':
         canvas.save();
         canvas.translate(c.dx, c.dy + r * 0.4);
         canvas.rotate(-0.4);
-        canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: r * 1.0, height: r * 0.65), stroke);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: r * 1.0,
+            height: r * 0.65,
+          ),
+          stroke,
+        );
         canvas.restore();
-        canvas.drawLine(Offset(c.dx + r * 0.45, c.dy + r * 0.3), Offset(c.dx + r * 0.45, c.dy - r * 1.2), stroke);
+        canvas.drawLine(
+          Offset(c.dx + r * 0.45, c.dy + r * 0.3),
+          Offset(c.dx + r * 0.45, c.dy - r * 1.2),
+          stroke,
+        );
       case 'circle':
         canvas.drawCircle(c, r * 0.8, stroke);
+
+      case 'dsharp':
+        // 굵은 ×. 네 끝이 살짝 두꺼운 겹올림표 모양이다.
+        final bold = Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = s * 0.16
+          ..strokeCap = StrokeCap.square;
+        canvas.drawLine(
+          Offset(c.dx - r * 0.5, c.dy - r * 0.5),
+          Offset(c.dx + r * 0.5, c.dy + r * 0.5),
+          bold,
+        );
+        canvas.drawLine(
+          Offset(c.dx + r * 0.5, c.dy - r * 0.5),
+          Offset(c.dx - r * 0.5, c.dy + r * 0.5),
+          bold,
+        );
+
+      case 'rest':
+        // 4분쉼표. 위에서 아래로 꺾어 내려오다 끝에 갈고리가 붙는다.
+        final path = Path()
+          ..moveTo(c.dx - r * 0.25, c.dy - r * 0.75)
+          ..lineTo(c.dx + r * 0.3, c.dy - r * 0.15)
+          ..lineTo(c.dx - r * 0.25, c.dy + r * 0.2)
+          ..cubicTo(
+            c.dx + r * 0.45,
+            c.dy + r * 0.15,
+            c.dx + r * 0.1,
+            c.dy + r * 0.7,
+            c.dx - r * 0.35,
+            c.dy + r * 0.8,
+          );
+        canvas.drawPath(path, stroke);
+
+      case 'segno':
+        // S 를 비스듬히 가로지르는 선과 양쪽 점.
+        final path = Path()
+          ..moveTo(c.dx + r * 0.55, c.dy - r * 0.45)
+          ..cubicTo(
+            c.dx + r * 0.1,
+            c.dy - r * 0.95,
+            c.dx - r * 0.6,
+            c.dy - r * 0.5,
+            c.dx - r * 0.1,
+            c.dy,
+          )
+          ..cubicTo(
+            c.dx + r * 0.6,
+            c.dy + r * 0.5,
+            c.dx - r * 0.1,
+            c.dy + r * 0.95,
+            c.dx - r * 0.55,
+            c.dy + r * 0.45,
+          );
+        canvas.drawPath(path, stroke);
+        canvas.drawLine(
+          Offset(c.dx - r * 0.7, c.dy + r * 0.7),
+          Offset(c.dx + r * 0.7, c.dy - r * 0.7),
+          stroke,
+        );
+        canvas.drawCircle(
+          Offset(c.dx - r * 0.55, c.dy - r * 0.35),
+          s * 0.07,
+          fill,
+        );
+        canvas.drawCircle(
+          Offset(c.dx + r * 0.55, c.dy + r * 0.35),
+          s * 0.07,
+          fill,
+        );
+
+      case 'coda':
+        // 동그라미를 열십자가 꿰뚫는다.
+        canvas.drawOval(
+          Rect.fromCenter(center: c, width: r * 1.1, height: r * 1.4),
+          stroke,
+        );
+        canvas.drawLine(
+          Offset(c.dx - r * 0.9, c.dy),
+          Offset(c.dx + r * 0.9, c.dy),
+          stroke,
+        );
+        canvas.drawLine(
+          Offset(c.dx, c.dy - r * 0.95),
+          Offset(c.dx, c.dy + r * 0.95),
+          stroke,
+        );
+
+      case 'repeat':
+        // 굵은 세로줄 + 가는 세로줄 + 점 둘. 도돌이표다.
+        final thick = Paint()
+          ..color = color
+          ..strokeWidth = s * 0.14
+          ..strokeCap = StrokeCap.butt;
+        canvas.drawLine(
+          Offset(c.dx - r * 0.65, c.dy - r * 0.8),
+          Offset(c.dx - r * 0.65, c.dy + r * 0.8),
+          thick,
+        );
+        canvas.drawLine(
+          Offset(c.dx - r * 0.3, c.dy - r * 0.8),
+          Offset(c.dx - r * 0.3, c.dy + r * 0.8),
+          stroke,
+        );
+        canvas.drawCircle(
+          Offset(c.dx + r * 0.25, c.dy - r * 0.3),
+          s * 0.08,
+          fill,
+        );
+        canvas.drawCircle(
+          Offset(c.dx + r * 0.25, c.dy + r * 0.3),
+          s * 0.08,
+          fill,
+        );
+
+      case 'eye':
+        // 안경. 눈여겨볼 곳에 붙인다.
+        canvas.drawCircle(Offset(c.dx - r * 0.45, c.dy), r * 0.35, stroke);
+        canvas.drawCircle(Offset(c.dx + r * 0.45, c.dy), r * 0.35, stroke);
+        canvas.drawLine(
+          Offset(c.dx - r * 0.1, c.dy),
+          Offset(c.dx + r * 0.1, c.dy),
+          stroke,
+        );
+        canvas.drawLine(
+          Offset(c.dx - r * 0.8, c.dy - r * 0.1),
+          Offset(c.dx - r * 0.95, c.dy - r * 0.35),
+          stroke,
+        );
+        canvas.drawLine(
+          Offset(c.dx + r * 0.8, c.dy - r * 0.1),
+          Offset(c.dx + r * 0.95, c.dy - r * 0.35),
+          stroke,
+        );
+
       default:
         canvas.drawCircle(c, r * 0.5, stroke);
     }

@@ -49,8 +49,10 @@ const stampGroups = <StampGroup>[
     StampDef('sharp', '샤프', glyph: '♯'),
     StampDef('flat', '플랫', glyph: '♭'),
     StampDef('natural', '내추럴', glyph: '♮'),
-    StampDef('dsharp', '더블샤프', glyph: '𝄪'),
-    StampDef('dflat', '더블플랫', glyph: '𝄫'),
+    // 𝄪 𝄫 는 대부분의 시스템 폰트에 없어 ? 로 나왔다. 하나는 직접 그리고
+    // 하나는 있는 글자를 겹쳐 쓴다.
+    StampDef('dsharp', '더블샤프'),
+    StampDef('dflat', '더블플랫', glyph: '♭♭'),
   ]),
   StampGroup('아티큘레이션', [
     StampDef('accent', '악센트'),
@@ -76,21 +78,44 @@ const stampGroups = <StampGroup>[
     StampDef('quarter', '4분음표', glyph: '♩'),
     StampDef('eighth', '8분음표', glyph: '♪'),
     StampDef('beamed', '8분음표 둘', glyph: '♫'),
-    StampDef('rest', '쉼표', glyph: '𝄽'),
+    StampDef('rest', '쉼표'),
   ]),
   StampGroup('구조', [
-    StampDef('segno', '세뇨', glyph: '𝄋'),
-    StampDef('coda', '코다', glyph: '𝄌'),
+    // 𝄋 𝄌 𝄆𝄇 도 폰트에 없어 직접 그린다.
+    StampDef('segno', '세뇨'),
+    StampDef('coda', '코다'),
     StampDef('ds', 'D.S.', glyph: 'D.S.'),
     StampDef('dc', 'D.C.', glyph: 'D.C.'),
     StampDef('fine', 'Fine', glyph: 'Fine', italic: true),
-    StampDef('repeat', '반복', glyph: '𝄆𝄇'),
+    StampDef('repeat', '반복'),
     StampDef('check', '체크', glyph: '✓'),
     StampDef('star', '별', glyph: '★'),
     StampDef('circle', '동그라미'),
     StampDef('x', '엑스', glyph: '✕'),
-    StampDef('eye', '주의', glyph: '👓'),
+    // 👓 는 이모지라 악보 위에서 혼자 튀었다. 안경을 직접 그린다.
+    StampDef('eye', '주의'),
     StampDef('breathe', '호흡', glyph: '∨'),
+  ]),
+  // 대중음악 악보에 적는 곡 구성 표시. 반복 구간을 부를 이름이 있어야
+  // 연습할 때 "브릿지부터" 같은 말이 통한다.
+  StampGroup('송폼', [
+    StampDef('intro', 'Intro', glyph: 'Intro'),
+    StampDef('verse', 'Verse', glyph: 'Verse'),
+    StampDef('prechorus', 'Pre', glyph: 'Pre'),
+    StampDef('chorus', 'Chorus', glyph: 'Chorus'),
+    StampDef('hook', 'Hook', glyph: 'Hook'),
+    StampDef('bridge', 'Bridge', glyph: 'Bridge'),
+    StampDef('interlude', '간주', glyph: 'Inter.'),
+    StampDef('solo', 'Solo', glyph: 'Solo'),
+    StampDef('outro', 'Outro', glyph: 'Outro'),
+    StampDef('ending', 'Ending', glyph: 'Ending'),
+    StampDef('tag', 'Tag', glyph: 'Tag'),
+    StampDef('vamp', 'Vamp', glyph: 'Vamp'),
+    StampDef('secA', 'A 파트', glyph: 'A'),
+    StampDef('secB', 'B 파트', glyph: 'B'),
+    StampDef('secC', 'C 파트', glyph: 'C'),
+    StampDef('first', '1번 괄호', glyph: '1.'),
+    StampDef('second', '2번 괄호', glyph: '2.'),
   ]),
 ];
 
