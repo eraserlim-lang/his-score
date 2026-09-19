@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
@@ -296,6 +297,8 @@ class PagedScoreViewState extends State<PagedScoreView>
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      // 펜은 넘기지 않는다. S펜은 필기 모드가 아닐 때도 끌기로 들어온다.
+      supportedDevices: _fingerDevices,
       // 가로 끌기로 겨루어야 탭 영역·확대와 사이좋게 지낸다. 손가락의
       // 세로 위치는 그 안에서도 그대로 받는다.
       onHorizontalDragStart: _onDragStart,
@@ -322,7 +325,7 @@ class PagedScoreViewState extends State<PagedScoreView>
     final turn = _turn;
     if (turn != null) {
       if (!_settle.isAnimating) {
-        setState(() => turn.finger = turn.clamp(d.localPosition));
+        setState(() => turn.finger = turn.clamp(turn.track(d.localPosition)));
       }
       return;
     }
@@ -377,6 +380,7 @@ class PagedScoreViewState extends State<PagedScoreView>
 
   void _onDragEnd(DragEndDetails d) {
     final start = _dragStart;
+    final latest = _latestDrag;
     _dragStart = null;
     _dragDecided = false;
     _latestDrag = null;
@@ -389,9 +393,10 @@ class PagedScoreViewState extends State<PagedScoreView>
     final forward = turn.dir == _TurnDir.forward;
     final vx = d.velocity.pixelsPerSecond.dx;
     final toward = forward ? -vx : vx;
+    final end = latest ?? turn.finger;
     final moved = start == null
         ? 0.0
-        : (forward ? start.dx - turn.finger.dx : turn.finger.dx - start.dx);
+        : (forward ? start.dx - end.dx : end.dx - start.dx);
     final bool commit;
     if (toward < -200) {
       commit = false;
@@ -519,13 +524,16 @@ class PagedScoreViewState extends State<PagedScoreView>
       image: image,
       back: back,
       rect: rect,
+      // 가장자리 어디를 잡든 그 높이에서 접힌다. 모서리로 몰면 가운데를
+      // 잡았을 때 접히는 선이 크게 기울어 엉뚱하게 접힌다.
       corner: Offset(
         forward ? rect.right : rect.left,
-        grabY < rect.center.dy ? rect.top : rect.bottom,
+        grabY.clamp(rect.top, rect.bottom),
       ),
       reveal: reveal,
+      dragOrigin: at != null && !rect.contains(at) ? (_dragStart ?? at) : null,
     );
-    if (at != null) turn.finger = turn.clamp(_latestDrag ?? at);
+    if (at != null) turn.finger = turn.clamp(turn.track(_latestDrag ?? at));
 
     setState(() {
       _preparing = false;
@@ -601,6 +609,9 @@ class PagedScoreViewState extends State<PagedScoreView>
   Widget _buildSpreads(ScrollPhysics physics) {
     return PageView.builder(
       key: const ValueKey('spreads'),
+      scrollBehavior: ScrollConfiguration.of(
+        context,
+      ).copyWith(dragDevices: _fingerDevices),
       controller: _controller,
       itemCount: widget.map.spreadCount,
       onPageChanged: _handlePageChanged,
@@ -632,6 +643,9 @@ class PagedScoreViewState extends State<PagedScoreView>
     final pageCount = widget.map.pageCount;
     return PageView.builder(
       key: const ValueKey('strip'),
+      scrollBehavior: ScrollConfiguration.of(
+        context,
+      ).copyWith(dragDevices: _fingerDevices),
       controller: _controller,
       padEnds: false,
       // 마지막 장이 왼쪽 자리까지 올 수 있게 빈 칸을 하나 덧붙인다.
@@ -683,12 +697,20 @@ class PagedScoreViewState extends State<PagedScoreView>
   }
 }
 
+/// 페이지를 넘기는 손. 펜은 뺀다. 자세한 까닭은 뷰어의 탭 영역 참고.
+const _fingerDevices = {
+  PointerDeviceKind.touch,
+  PointerDeviceKind.mouse,
+  PointerDeviceKind.trackpad,
+};
+
 enum _TurnDir { forward, backward }
 
 /// 넘어가는 중인 장 하나.
 ///
-/// [corner] 는 잡은 모서리다. 앞으로 넘길 때는 오른쪽, 되돌릴 때는 왼쪽
-/// 모서리이고 반대쪽 변이 책등이다. [finger] 는 그 모서리가 지금 와 있는
+/// [corner] 는 잡은 지점이다. 앞으로 넘길 때는 오른쪽 변, 되돌릴 때는 왼쪽
+/// 변 위의 한 점이고 반대쪽 변이 책등이다. 모서리를 잡으면 대각선으로,
+/// 가운데를 잡으면 세로에 가깝게 접힌다. [finger] 는 그 모서리가 지금 와 있는
 /// 자리다. 두 방향의 기하는 좌우가 뒤집혔을 뿐 같다.
 class _PageTurn {
   _PageTurn({
@@ -698,7 +720,21 @@ class _PageTurn {
     required this.rect,
     required this.corner,
     required this.reveal,
+    this.dragOrigin,
   }) : finger = corner;
+
+  /// 여백에서 잡았으면 끌기가 시작된 자리. 종이 위에서 잡았으면 null.
+  final Offset? dragOrigin;
+
+  /// 손가락 자리를 기준점이 갈 자리로 바꾼다.
+  ///
+  /// 종이 위에서 잡았으면 그 자리 그대로다. 모서리가 손가락으로 튀어 와
+  /// 손에 붙는다. 여백에서 잡았으면 손가락 자리는 종이와 무관하므로 처음
+  /// 자리에서 움직인 만큼만 기준점을 옮긴다.
+  Offset track(Offset p) {
+    final origin = dragOrigin;
+    return origin == null ? p : corner + (p - origin);
+  }
 
   final _TurnDir dir;
   final ui.Image image;
@@ -723,14 +759,14 @@ class _PageTurn {
     corner.dy,
   );
 
-  Offset get _spineSameRow => Offset(_spineX, corner.dy);
-  Offset get _spineOtherRow =>
-      Offset(_spineX, corner.dy == rect.top ? rect.bottom : rect.top);
+  Offset get _spineTop => Offset(_spineX, rect.top);
+  Offset get _spineBottom => Offset(_spineX, rect.bottom);
 
   /// 손가락 자리를 종이가 찢어지지 않는 범위로 붙든다.
   ///
-  /// 종이는 책등에 묶여 있어 모서리가 같은 줄 책등 모서리에서 폭보다,
-  /// 반대 줄 모서리에서 대각선보다 멀리 갈 수 없다.
+  /// 종이는 책등에 묶여 있다. 잡은 지점은 책등의 두 모서리에서 처음 거리보다
+  /// 멀어질 수 없다. 모서리를 잡았으면 같은 줄에서 폭, 반대 줄에서 대각선이고
+  /// 가운데를 잡았으면 둘 다 그 사이 값이다.
   Offset clamp(Offset p) {
     var q = Offset(
       _forward
@@ -738,8 +774,8 @@ class _PageTurn {
           : p.dx.clamp(rect.left + 0.5, rect.right + rect.width),
       p.dy.clamp(rect.top, rect.bottom),
     );
-    q = _within(q, _spineSameRow, rect.width);
-    q = _within(q, _spineOtherRow, (rect.bottomRight - rect.topLeft).distance);
+    q = _within(q, _spineTop, (corner - _spineTop).distance);
+    q = _within(q, _spineBottom, (corner - _spineBottom).distance);
     return q;
   }
 
