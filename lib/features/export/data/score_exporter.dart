@@ -55,20 +55,49 @@ class ScoreExporter {
   Future<Uint8List> originalBytes(Score score) =>
       _paths.resolve(score.filePath).readAsBytes();
 
-  Future<Uint8List> build(Score score, ExportOptions options, {void Function(int done, int total)? onProgress}) async {
+  Future<PdfDocument> _open(Score score) {
     final file = _paths.resolve(score.filePath);
-    final document = await PdfDocument.openFile(
+    return PdfDocument.openFile(
       file.path,
       passwordProvider: score.pdfPassword == null ? null : () => score.pdfPassword,
       firstAttemptByEmptyPassword: score.pdfPassword == null,
     );
+  }
+
+  /// 내보낼 페이지를 화면과 같은 순서로 놓는다.
+  Future<List<ScorePage>> _ordered(Score score, ExportOptions options) async {
+    final rows = options.applyPageEdits
+        ? await _scores.visiblePages(score.id)
+        : await _scores.allPages(score.id);
+    return options.applyPageEdits
+        ? rows
+        : (rows.toList()..sort((a, b) => a.sourceIndex.compareTo(b.sourceIndex)));
+  }
+
+  /// 한 쪽만 PNG 로 굽는다. [ExportOptions.firstPage] 가 그 쪽이다.
+  ///
+  /// 지금 보는 쪽을 그림으로 빠르게 넘길 때 쓴다. PDF 와 달리 어디에나
+  /// 바로 붙일 수 있다.
+  Future<Uint8List?> pageImage(Score score, ExportOptions options) async {
+    final document = await _open(score);
     try {
-      final rows = options.applyPageEdits
-          ? await _scores.visiblePages(score.id)
-          : await _scores.allPages(score.id);
-      final ordered = options.applyPageEdits
-          ? rows
-          : (rows.toList()..sort((a, b) => a.sourceIndex.compareTo(b.sourceIndex)));
+      final ordered = await _ordered(score, options);
+      if (ordered.isEmpty) return null;
+      final at = (options.firstPage ?? 0).clamp(0, ordered.length - 1);
+      final image = await _renderRow(document, score, ordered[at], options);
+      if (image == null) return null;
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      return png?.buffer.asUint8List();
+    } finally {
+      document.dispose();
+    }
+  }
+
+  Future<Uint8List> build(Score score, ExportOptions options, {void Function(int done, int total)? onProgress}) async {
+    final document = await _open(score);
+    try {
+      final ordered = await _ordered(score, options);
 
       final first = (options.firstPage ?? 0).clamp(0, ordered.length);
       final last = (options.lastPage ?? ordered.length - 1).clamp(first, ordered.length - 1);

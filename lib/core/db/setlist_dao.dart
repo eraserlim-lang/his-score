@@ -134,6 +134,38 @@ class SetlistDao extends DatabaseAccessor<AppDatabase> with _$SetlistDaoMixin {
     });
   }
 
+  /// 곡 하나를 세트리스트 끝에 붙인다.
+  ///
+  /// [startPage]/[endPage] 를 주면 그 구간만 담는다. 보고 있는 한 쪽만
+  /// 세트에 넣을 때 쓴다. 넣은 항목의 id 를 돌려준다.
+  Future<String> addScore(
+    String setlistId,
+    String scoreId, {
+    int? startPage,
+    int? endPage,
+  }) {
+    final itemId = _uuid.v4();
+    return transaction(() async {
+      final last = await (selectOnly(setlistItems)
+            ..addColumns([setlistItems.sortOrder.max()])
+            ..where(setlistItems.setlistId.equals(setlistId)))
+          .getSingle();
+      final order = (last.read(setlistItems.sortOrder.max()) ?? -1) + 1;
+      await into(setlistItems).insert(
+        SetlistItemsCompanion.insert(
+          id: itemId,
+          setlistId: setlistId,
+          scoreId: scoreId,
+          sortOrder: order,
+          startPage: Value(startPage),
+          endPage: Value(endPage),
+        ),
+      );
+      await _touch(setlistId);
+      return itemId;
+    });
+  }
+
   Future<void> _appendAll(
     String setlistId,
     List<String> scoreIds, {
