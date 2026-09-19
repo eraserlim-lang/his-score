@@ -12,6 +12,11 @@ class AnnotationToolState extends ChangeNotifier {
   PenPreset _preset = PenPreset.pen;
   /// 악보 위 필기는 인쇄된 음표와 섞이지 않아야 한다. 빨강이 가장 눈에 띈다.
   Color _color = ViewerColors.inkDefault;
+
+  /// 도구 막대에 내놓는 빠른 색 여섯 칸. 길게 눌러 다른 색으로 바꾼다.
+  /// 쓰는 색은 사람마다 달라서(운지는 파랑, 주의는 빨강 식으로) 고정하면
+  /// 매번 넓은 팔레트를 열어야 한다.
+  List<Color> _palette = List.of(ViewerColors.inkColors);
   double _width = 1.0;
   double _eraserRadius = 14;
   String _stampId = 'f1';
@@ -26,6 +31,7 @@ class AnnotationToolState extends ChangeNotifier {
   InkTool get tool => _tool;
   PenPreset get preset => _preset;
   Color get color => _color;
+  List<Color> get palette => List.unmodifiable(_palette);
   double get width => _width;
   double get eraserRadius => _eraserRadius;
   String get stampId => _stampId;
@@ -51,6 +57,16 @@ class AnnotationToolState extends ChangeNotifier {
 
   void setColor(Color color) {
     _color = color;
+    notifyListeners();
+  }
+
+  /// 빠른 색 한 칸을 다른 색으로 갈아 끼운다. 그 칸을 쓰고 있었으면
+  /// 지금 색도 함께 옮겨 간다. 안 그러면 방금 고른 색이 사라져 보인다.
+  void setPaletteColor(int index, Color color) {
+    if (index < 0 || index >= _palette.length) return;
+    final replacing = _palette[index] == _color;
+    _palette = List.of(_palette)..[index] = color;
+    if (replacing) _color = color;
     notifyListeners();
   }
 

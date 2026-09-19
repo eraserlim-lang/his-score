@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/db/tables.dart';
+import '../../../core/layout/center_sheet.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/page_ink_store.dart';
 import '../domain/annotation_tool_state.dart';
@@ -50,9 +51,13 @@ class AnnotationToolbar extends StatelessWidget {
                   IconButton(
                     onPressed: tools.toggleToolbarPosition,
                     icon: Icon(
-                      tools.toolbarAtBottom ? Icons.vertical_align_top : Icons.vertical_align_bottom,
+                      tools.toolbarAtBottom
+                          ? Icons.vertical_align_top
+                          : Icons.vertical_align_bottom,
                     ),
-                    tooltip: tools.toolbarAtBottom ? tr('위로 옮기기') : tr('아래로 옮기기'),
+                    tooltip: tools.toolbarAtBottom
+                        ? tr('위로 옮기기')
+                        : tr('아래로 옮기기'),
                   ),
                   const VerticalDivider(indent: 12, endIndent: 12),
                   for (final preset in PenPreset.values)
@@ -61,7 +66,8 @@ class AnnotationToolbar extends StatelessWidget {
                       builder: (buttonContext) => _ToolButton(
                         icon: _presetIcon(preset),
                         label: tr(preset.label),
-                        selected: tools.tool == InkTool.pen && tools.preset == preset,
+                        selected:
+                            tools.tool == InkTool.pen && tools.preset == preset,
                         onTap: () => tools.setPreset(preset),
                         onLongPress: () => _showPenOptions(buttonContext),
                       ),
@@ -100,20 +106,25 @@ class AnnotationToolbar extends StatelessWidget {
                     onTap: () => tools.setTool(InkTool.select),
                   ),
                   const VerticalDivider(indent: 12, endIndent: 12),
-                  for (final color in ViewerColors.inkColors)
+                  for (final (i, color) in tools.palette.indexed)
                     _ColorDot(
                       color: color,
                       selected: tools.color == color,
                       onTap: () => tools.setColor(color),
+                      onLongPress: () => _pickPaletteColor(context, i),
                     ),
                   const VerticalDivider(indent: 12, endIndent: 12),
                   IconButton(
-                    onPressed: pageController?.canUndo == true ? pageController!.undo : null,
+                    onPressed: pageController?.canUndo == true
+                        ? pageController!.undo
+                        : null,
                     icon: const Icon(Icons.undo),
                     tooltip: tr('실행 취소'),
                   ),
                   IconButton(
-                    onPressed: pageController?.canRedo == true ? pageController!.redo : null,
+                    onPressed: pageController?.canRedo == true
+                        ? pageController!.redo
+                        : null,
                     icon: const Icon(Icons.redo),
                     tooltip: tr('다시 실행'),
                   ),
@@ -128,8 +139,14 @@ class AnnotationToolbar extends StatelessWidget {
                       }
                     },
                     itemBuilder: (context) => [
-                      PopupMenuItem(value: 'page', child: Text(tr('이 페이지 필기 지우기'))),
-                      PopupMenuItem(value: 'all', child: Text(tr('전체 페이지 필기 지우기'))),
+                      PopupMenuItem(
+                        value: 'page',
+                        child: Text(tr('이 페이지 필기 지우기')),
+                      ),
+                      PopupMenuItem(
+                        value: 'all',
+                        child: Text(tr('전체 페이지 필기 지우기')),
+                      ),
                     ],
                   ),
                   if (tools.stylusSeen)
@@ -137,7 +154,9 @@ class AnnotationToolbar extends StatelessWidget {
                       onPressed: () => tools.setFingerDraws(!tools.fingerDraws),
                       isSelected: tools.fingerDraws,
                       icon: const Icon(Icons.touch_app_outlined),
-                      tooltip: tools.fingerDraws ? tr('손가락: 그리기') : tr('손가락: 페이지 넘김'),
+                      tooltip: tools.fingerDraws
+                          ? tr('손가락: 그리기')
+                          : tr('손가락: 페이지 넘김'),
                     ),
                   const VerticalDivider(indent: 12, endIndent: 12),
                   IconButton(
@@ -155,57 +174,39 @@ class AnnotationToolbar extends StatelessWidget {
   }
 
   IconData _presetIcon(PenPreset p) => switch (p) {
-        PenPreset.pen => Icons.edit,
-        PenPreset.marker => Icons.border_color,
-        PenPreset.pencil => Icons.create_outlined,
-        PenPreset.brush => Icons.brush,
-      };
+    PenPreset.pen => Icons.edit,
+    PenPreset.marker => Icons.border_color,
+    PenPreset.pencil => Icons.create_outlined,
+    PenPreset.brush => Icons.brush,
+  };
 
-  /// 펜 옵션을 그 버튼 자리에 팝업으로 띄운다.
+  /// 펜 옵션을 화면 가운데 판으로 띄운다.
   ///
-  /// 바닥 시트로 열면 악보 아래쪽이 가려져 방금 그은 획을 보면서 굵기나
-  /// 색을 고를 수 없었다. 팝업은 버튼 옆에만 떠서 획이 보인다.
-  Future<void> _showPenOptions(BuildContext context) async {
-    final button = context.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (button == null || overlay == null) return;
-
-    final corner = button.localToGlobal(Offset.zero, ancestor: overlay);
-    // 막대가 아래에 있으면 위로, 위에 있으면 아래로 편다.
-    final position = tools.toolbarAtBottom
-        ? RelativeRect.fromLTRB(
-            corner.dx,
-            0,
-            overlay.size.width - corner.dx - button.size.width,
-            overlay.size.height - corner.dy,
-          )
-        : RelativeRect.fromLTRB(
-            corner.dx,
-            corner.dy + button.size.height,
-            overlay.size.width - corner.dx - button.size.width,
-            0,
-          );
-
-    await showMenu<void>(
-      context: context,
-      position: position,
-      constraints: const BoxConstraints(minWidth: 280, maxWidth: 320),
-      items: [
-        PopupMenuItem<void>(
-          // 팝업을 닫지 않고 계속 고칠 수 있어야 한다.
-          enabled: false,
-          padding: EdgeInsets.zero,
-          child: _PenOptions(tools: tools),
-        ),
-      ],
+  /// 버튼 옆에 띄우면 막대가 아래에 있을 때 손이 판을 가리고, 좁은 화면에서는
+  /// 팔레트가 잘렸다. 가운데는 어느 막대 자리에서도 같게 보인다.
+  Future<void> _showPenOptions(BuildContext context) {
+    return showCenterSheet<void>(
+      context,
+      maxWidth: 380,
+      child: _PenOptions(tools: tools),
     );
   }
 
+  /// 빠른 색 한 칸을 길게 눌렀을 때. 넓은 팔레트에서 새 색을 고른다.
+  Future<void> _pickPaletteColor(BuildContext context, int index) async {
+    final picked = await showCenterSheet<Color>(
+      context,
+      maxWidth: 360,
+      child: _PalettePicker(current: tools.palette[index]),
+    );
+    if (picked != null) tools.setPaletteColor(index, picked);
+  }
+
   void _showEraser(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (context) => _SliderSheet(
+    showCenterSheet<void>(
+      context,
+      maxWidth: 360,
+      child: _SliderSheet(
         title: tr('지우개 크기'),
         listenable: tools,
         value: () => tools.eraserRadius,
@@ -230,9 +231,10 @@ class AnnotationToolbar extends StatelessWidget {
   }
 
   void _showTextSize(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (context) => _SliderSheet(
+    showCenterSheet<void>(
+      context,
+      maxWidth: 360,
+      child: _SliderSheet(
         title: tr('글자 크기'),
         listenable: tools,
         value: () => tools.textSize,
@@ -242,7 +244,10 @@ class AnnotationToolbar extends StatelessWidget {
         preview: (v) => SizedBox(
           height: 130,
           child: Center(
-            child: Text('rit.', style: TextStyle(fontSize: v * 0.6, color: tools.color)),
+            child: Text(
+              'rit.',
+              style: TextStyle(fontSize: v * 0.6, color: tools.color),
+            ),
           ),
         ),
       ),
@@ -250,18 +255,19 @@ class AnnotationToolbar extends StatelessWidget {
   }
 
   void _showStamps(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => FractionallySizedBox(
-        heightFactor: 0.7,
-        child: StampPalette(
+    showCenterSheet<void>(
+      context,
+      maxWidth: 560,
+      // 목록이 안에서 스스로 스크롤한다.
+      fill: true,
+      scrollable: false,
+      child: Builder(
+        builder: (sheetContext) => StampPalette(
           selected: tools.stampId,
           color: tools.color,
           onSelected: (id) {
             tools.setStamp(id);
-            Navigator.pop(context);
+            Navigator.pop(sheetContext);
           },
         ),
       ),
@@ -269,11 +275,12 @@ class AnnotationToolbar extends StatelessWidget {
   }
 
   void _showShapes(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Wrap(
+    showCenterSheet<void>(
+      context,
+      maxWidth: 360,
+      child: Builder(
+        builder: (context) => Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             for (final kind in ShapeKind.values)
               ListTile(
@@ -292,6 +299,42 @@ class AnnotationToolbar extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 빠른 색 한 칸에 넣을 색을 고른다.
+class _PalettePicker extends StatelessWidget {
+  const _PalettePicker({required this.current});
+
+  final Color current;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(tr('색 바꾸기'), style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(
+          tr('고른 색이 이 칸에 들어갑니다.'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final color in ViewerColors.inkPalette)
+              _ColorDot(
+                color: color,
+                selected: color == current,
+                onTap: () => Navigator.pop(context, color),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -378,7 +421,11 @@ class _ToolButton extends StatelessWidget {
             color: selected ? scheme.secondaryContainer : null,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, size: 22, color: selected ? scheme.onSecondaryContainer : null),
+          child: Icon(
+            icon,
+            size: 22,
+            color: selected ? scheme.onSecondaryContainer : null,
+          ),
         ),
       ),
     );
@@ -386,16 +433,25 @@ class _ToolButton extends StatelessWidget {
 }
 
 class _ColorDot extends StatelessWidget {
-  const _ColorDot({required this.color, required this.selected, required this.onTap});
+  const _ColorDot({
+    required this.color,
+    required this.selected,
+    required this.onTap,
+    this.onLongPress,
+  });
 
   final Color color;
   final bool selected;
   final VoidCallback onTap;
 
+  /// 주면 길게 눌러 이 칸의 색을 바꿀 수 있다.
+  final VoidCallback? onLongPress;
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       customBorder: const CircleBorder(),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -406,7 +462,9 @@ class _ColorDot extends StatelessWidget {
             color: color,
             shape: BoxShape.circle,
             border: Border.all(
-              color: selected ? Theme.of(context).colorScheme.primary : Colors.white,
+              color: selected
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.white,
               width: selected ? 3 : 2,
             ),
           ),
@@ -476,7 +534,11 @@ class _WidthPreview extends CustomPainter {
       preset: preset,
       points: [
         for (var i = 0; i <= 20; i++)
-          InkPoint(i / 20, 0.5 + 0.3 * (i.isEven ? 1 : -1) * (i % 3 == 0 ? 1 : 0.4), (i / 20)),
+          InkPoint(
+            i / 20,
+            0.5 + 0.3 * (i.isEven ? 1 : -1) * (i % 3 == 0 ? 1 : 0.4),
+            (i / 20),
+          ),
       ],
     );
     InkPainter.paintStroke(
@@ -522,7 +584,8 @@ class _ShapePreview extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ShapePreview old) => old.kind != kind || old.color != color;
+  bool shouldRepaint(_ShapePreview old) =>
+      old.kind != kind || old.color != color;
 }
 
 /// 스탬프 고르기.
@@ -546,7 +609,10 @@ class StampPalette extends StatelessWidget {
         for (final group in stampGroups) ...[
           Padding(
             padding: const EdgeInsets.only(top: 12, bottom: 6),
-            child: Text(tr(group.title), style: Theme.of(context).textTheme.labelLarge),
+            child: Text(
+              tr(group.title),
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
           ),
           Wrap(
             spacing: 8,
@@ -559,7 +625,7 @@ class StampPalette extends StatelessWidget {
                     onTap: () => onSelected(stamp.id),
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
-                      width: 52,
+                      width: 64,
                       height: 52,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
@@ -570,7 +636,9 @@ class StampPalette extends StatelessWidget {
                           width: stamp.id == selected ? 2 : 1,
                         ),
                       ),
-                      child: CustomPaint(painter: _StampPreview(stamp.id, color)),
+                      child: CustomPaint(
+                        painter: _StampPreview(stamp.id, color),
+                      ),
                     ),
                   ),
                 ),
@@ -605,6 +673,8 @@ class _StampPreview extends CustomPainter {
         crop: const Rect.fromLTRB(0, 0, 1, 1),
         scaleOverride: 1,
       ),
+      // 칸 밖으로 삐져나오지 않게 글자를 줄인다. 양옆에 숨 쉴 자리를 둔다.
+      maxWidth: size.width - 8,
     );
   }
 

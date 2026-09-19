@@ -27,6 +27,7 @@ class InkLayer extends StatefulWidget {
     required this.editing,
     required this.tools,
     this.onRequestText,
+    this.onRequestStamp,
   });
 
   final PageInkController controller;
@@ -37,6 +38,9 @@ class InkLayer extends StatefulWidget {
 
   /// 텍스트 도구로 화면을 찍었을 때 본문을 받아 오는 콜백.
   final Future<String?> Function(String initial)? onRequestText;
+
+  /// 놓아 둔 스탬프를 고칠 때 새 기호를 받아 오는 콜백.
+  final Future<String?> Function(String current)? onRequestStamp;
 
   @override
   State<InkLayer> createState() => _InkLayerState();
@@ -78,7 +82,8 @@ class _InkLayerState extends State<InkLayer> {
     final tools = widget.tools;
 
     // 지우개 뒷면(Apple Pencil 2 의 뒤집기 등)은 도구와 무관하게 지운다.
-    final erasing = tools.tool == InkTool.eraser ||
+    final erasing =
+        tools.tool == InkTool.eraser ||
         e.kind == PointerDeviceKind.invertedStylus;
 
     if (erasing) {
@@ -155,7 +160,9 @@ class _InkLayerState extends State<InkLayer> {
     final live = _live;
     if (live != null) {
       if (live.isShape) {
-        _live = live.copyWith(points: [live.points.first, InkPoint(n.dx, n.dy)]);
+        _live = live.copyWith(
+          points: [live.points.first, InkPoint(n.dx, n.dy)],
+        );
       } else {
         // 너무 촘촘한 점은 버린다. 파일이 커지고 렌더만 느려진다.
         final last = live.points.last;
@@ -303,8 +310,9 @@ class _InkLayerState extends State<InkLayer> {
   Future<void> _editSelected() async {
     final id = _selectedId;
     if (id == null) return;
-    final item =
-        widget.controller.ink.placed.where((p) => p.id == id).firstOrNull;
+    final item = widget.controller.ink.placed
+        .where((p) => p.id == id)
+        .firstOrNull;
     if (item == null) return;
     if (item.kind == PlacedKind.text) {
       final text = await widget.onRequestText?.call(item.value);
@@ -314,14 +322,21 @@ class _InkLayerState extends State<InkLayer> {
       } else {
         widget.controller.updatePlaced(item, item.copyWith(value: text.trim()));
       }
+      return;
     }
+
+    // 스탬프는 기호를 갈아 끼운다. 자리와 크기는 그대로 둔다.
+    final stamp = await widget.onRequestStamp?.call(item.value);
+    if (stamp == null || stamp == item.value) return;
+    widget.controller.updatePlaced(item, item.copyWith(value: stamp));
   }
 
   void _deleteSelected() {
     final id = _selectedId;
     if (id == null) return;
-    final item =
-        widget.controller.ink.placed.where((p) => p.id == id).firstOrNull;
+    final item = widget.controller.ink.placed
+        .where((p) => p.id == id)
+        .firstOrNull;
     if (item != null) widget.controller.removePlaced(item);
     setState(() => _selectedId = null);
   }
@@ -365,7 +380,8 @@ class _InkLayerState extends State<InkLayer> {
                     size: size,
                     // 펜 획은 PencilKit 이 들고 있어 지우개도 PencilKit 이 받아야 지워진다.
                     // 도형처럼 Flutter 가 그린 획은 같은 손짓을 이 층이 함께 받아 지운다.
-                    editing: widget.editing &&
+                    editing:
+                        widget.editing &&
                         (widget.tools.tool == InkTool.pen ||
                             widget.tools.tool == InkTool.eraser),
                   )
@@ -388,49 +404,65 @@ class _InkLayerState extends State<InkLayer> {
                 // 여기서 터치를 먹으면 아래 PencilKit 캔버스까지 닿지 않아
                 // iOS 에서 펜으로도 손가락으로도 써지지 않는다.
                 IgnorePointer(child: painter),
-                if (_selectedId != null && widget.tools.tool == InkTool.select)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Row(
-                      children: [
-                        IconButton.filledTonal(
-                          onPressed: _editSelected,
-                          icon: const Icon(Icons.edit, size: 18),
-                          tooltip: tr('내용 고치기'),
-                        ),
-                        IconButton.filledTonal(
-                          onPressed: _deleteSelected,
-                          icon: const Icon(Icons.delete, size: 18),
-                          tooltip: tr('지우기'),
-                        ),
-                      ],
-                    ),
-                  ),
               ],
             );
 
             // 스타일러스(또는 손가락 그리기 설정 시 손가락)를 제스처 경쟁에서
             // 먼저 가져간다. 그래야 페이지뷰가 획을 스와이프로 오해하지 않는다.
-            return RawGestureDetector(
+            final gestures = RawGestureDetector(
               gestures: {
-                _InkRecognizer: GestureRecognizerFactoryWithHandlers<_InkRecognizer>(
-                  () => _InkRecognizer(
-                    accepts: _accepts,
-                    onDown: (e) => _down(e, size),
-                    onMove: (e) => _move(e, size),
-                    onUp: _up,
-                  ),
-                  (r) {
-                    r.accepts = _accepts;
-                    r.onDown = (e) => _down(e, size);
-                    r.onMove = (e) => _move(e, size);
-                    r.onUp = _up;
-                  },
-                ),
+                _InkRecognizer:
+                    GestureRecognizerFactoryWithHandlers<_InkRecognizer>(
+                      () => _InkRecognizer(
+                        accepts: _accepts,
+                        onDown: (e) => _down(e, size),
+                        onMove: (e) => _move(e, size),
+                        onUp: _up,
+                      ),
+                      (r) {
+                        r.accepts = _accepts;
+                        r.onDown = (e) => _down(e, size);
+                        r.onMove = (e) => _move(e, size);
+                        r.onUp = _up;
+                      },
+                    ),
               },
               behavior: HitTestBehavior.opaque,
               child: layer,
+            );
+
+            // 고치기·지우기 단추는 인식기 바깥에 둔다. 안에 두면 단추를 누른
+            // 손가락이 인식기에도 닿아 _down 이 "빈 곳을 눌렀다" 로 보고 선택을
+            // 풀어 버린다. 단추가 사라진 뒤에 눌림이 도착하니 아무 일도 안 났다.
+            // Stack 은 위에 있는 자식부터 맞히므로 단추가 먼저 받는다.
+            if (_selectedId == null || widget.tools.tool != InkTool.select) {
+              return gestures;
+            }
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                gestures,
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton.filledTonal(
+                        onPressed: _editSelected,
+                        icon: const Icon(Icons.edit, size: 18),
+                        tooltip: tr('내용 고치기'),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton.filledTonal(
+                        onPressed: _deleteSelected,
+                        icon: const Icon(Icons.delete, size: 18),
+                        tooltip: tr('지우기'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             );
           },
         );
