@@ -27,45 +27,49 @@ enum MusicTool {
 }
 
 Widget _toolBody(MusicTool tool, String? scoreId) => switch (tool) {
-      MusicTool.metronome => const MetronomePanel(),
-      MusicTool.keyboard => const KeyboardPanel(),
-      MusicTool.tuner => const TunerPanel(),
-      MusicTool.recorder => RecorderPanel(scoreId: scoreId),
-      MusicTool.player => const PlayerPanel(),
-    };
+  MusicTool.metronome => const MetronomePanel(),
+  MusicTool.keyboard => const KeyboardPanel(),
+  MusicTool.tuner => const TunerPanel(),
+  MusicTool.recorder => RecorderPanel(scoreId: scoreId),
+  MusicTool.player => const PlayerPanel(),
+};
 
 /// 도구 하나를 연다. 닫아도 메트로놈과 재생은 계속된다.
 ///
 /// 건반만 바닥 시트로 둔다. 건반은 화면 아래 폭을 다 써야 짚을 만하고,
 /// 손이 가는 자리도 아래쪽이다. 나머지는 가운데 판으로 연다.
-Future<void> showMusicTool(BuildContext context, MusicTool tool, {String? scoreId}) {
+Future<void> showMusicTool(
+  BuildContext context,
+  MusicTool tool, {
+  String? scoreId,
+}) {
   // 닫은 뒤에도 창을 띄워야 하므로 부르는 쪽 context 를 들고 있는다.
   final host = context;
 
   Widget body(BuildContext inner) => Column(
-        mainAxisSize: MainAxisSize.min,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  tr(tool.label),
-                  style: Theme.of(inner).textTheme.titleMedium,
-                ),
-              ),
-              IconButton(
-                tooltip: tr('별도 창으로 띄우기'),
-                icon: const Icon(Icons.open_in_new),
-                onPressed: () {
-                  Navigator.pop(inner);
-                  openMusicToolWindow(host, tool, scoreId: scoreId);
-                },
-              ),
-            ],
+          Expanded(
+            child: Text(
+              tr(tool.label),
+              style: Theme.of(inner).textTheme.titleMedium,
+            ),
           ),
-          _toolBody(tool, scoreId),
+          IconButton(
+            tooltip: tr('별도 창으로 띄우기'),
+            icon: const Icon(Icons.open_in_new),
+            onPressed: () {
+              Navigator.pop(inner);
+              openMusicToolWindow(host, tool, scoreId: scoreId);
+            },
+          ),
         ],
-      );
+      ),
+      _toolBody(tool, scoreId),
+    ],
+  );
 
   if (tool != MusicTool.keyboard) {
     return showCenterSheet<void>(
@@ -91,14 +95,22 @@ Future<void> showMusicTool(BuildContext context, MusicTool tool, {String? scoreI
 }
 
 /// 도구를 악보 위에 떠 있는 창으로 연다. 악보를 보면서 쓸 수 있다.
-void openMusicToolWindow(BuildContext context, MusicTool tool, {String? scoreId}) {
+void openMusicToolWindow(
+  BuildContext context,
+  MusicTool tool, {
+  String? scoreId,
+}) {
   showFloatingWindow(
     context: context,
     title: tr(tool.label),
-    // 건반은 옆으로 넓어야 짚을 만하다.
-    initialSize: tool == MusicTool.keyboard
-        ? const Size(640, 300)
-        : const Size(430, 400),
+    // 건반은 옆으로 넓어야 짚을 만하고, 메트로놈은 조절할 것이 많아 높다.
+    // 처음 열릴 때 내용이 잘리면 안 된다.
+    initialSize: switch (tool) {
+      MusicTool.keyboard => const Size(640, 300),
+      MusicTool.metronome => const Size(480, 600),
+      MusicTool.tuner => const Size(420, 440),
+      _ => const Size(430, 400),
+    },
     builder: (context, close) => _toolBody(tool, scoreId),
   );
 }
@@ -117,11 +129,11 @@ class ToolRail extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     bool active(MusicTool t) => switch (t) {
-          MusicTool.metronome => metronome.running,
-          MusicTool.player => player.hasTrack,
-          MusicTool.recorder => recorder.recording,
-          _ => false,
-        };
+      MusicTool.metronome => metronome.running,
+      MusicTool.player => player.hasTrack,
+      MusicTool.recorder => recorder.recording,
+      _ => false,
+    };
 
     return Material(
       color: scheme.surface.withValues(alpha: 0.92),
@@ -179,19 +191,17 @@ class MetronomePanel extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            IconButton.filledTonal(onPressed: () => m.nudge(-1), icon: const Icon(Icons.remove)),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => _askBpm(context, m),
-              child: Column(
-                children: [
-                  Text('${m.bpm}', style: Theme.of(context).textTheme.displaySmall),
-                  Text(m.tempoName, style: Theme.of(context).textTheme.labelMedium),
-                ],
-              ),
+            IconButton.filledTonal(
+              onPressed: () => m.nudge(-1),
+              icon: const Icon(Icons.remove),
             ),
             const SizedBox(width: 8),
-            IconButton.filledTonal(onPressed: () => m.nudge(1), icon: const Icon(Icons.add)),
+            _BpmField(metronome: m),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: () => m.nudge(1),
+              icon: const Icon(Icons.add),
+            ),
           ],
         ),
         Slider(
@@ -200,50 +210,78 @@ class MetronomePanel extends ConsumerWidget {
           max: MetronomeController.maxBpm.toDouble(),
           onChanged: (v) => m.setBpm(v.round()),
         ),
+        _Labeled(
+          label: tr('박자'),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final n in [2, 3, 4, 5, 6, 7])
+                _ToggleButton(
+                  label: '$n',
+                  selected: m.beatsPerBar == n,
+                  onTap: () => m.setBeatsPerBar(n),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        _Labeled(
+          label: tr('분할'),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final (n, l) in [(1, '♩'), (2, '♫'), (3, '3'), (4, '4')])
+                _ToggleButton(
+                  label: l,
+                  selected: m.subdivision == n,
+                  onTap: () => m.setSubdivision(n),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // TAP 은 손가락으로 박자를 두드리는 버튼이라 크게. 좁은 창에서는
+        // 아래로 내려가도록 Wrap 으로 둔다. Row 는 넘쳐서 잘렸다.
         Wrap(
           spacing: 8,
-          runSpacing: 4,
+          runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text(tr('박자')),
-            for (final n in [2, 3, 4, 5, 6, 7])
-              ChoiceChip(
-                label: Text('$n'),
-                selected: m.beatsPerBar == n,
-                onSelected: (_) => m.setBeatsPerBar(n),
-              ),
-            const SizedBox(width: 12),
-            Text(tr('분할')),
-            for (final (n, l) in [(1, '♩'), (2, '♫'), (3, '3'), (4, '4')])
-              ChoiceChip(
-                label: Text(l),
-                selected: m.subdivision == n,
-                onSelected: (_) => m.setSubdivision(n),
-              ),
-          ],
-        ),
-        Row(
-          children: [
-            FilterChip(
-              label: Text(tr('첫 박 강세')),
+            _ToggleButton(
+              label: tr('첫 박 강세'),
               selected: m.accentFirst,
-              onSelected: m.setAccentFirst,
+              onTap: () => m.setAccentFirst(!m.accentFirst),
             ),
-            const SizedBox(width: 8),
-            FilterChip(
-              label: Text(tr('무음')),
-              avatar: Icon(m.silent ? Icons.volume_off : Icons.volume_up, size: 16),
+            _ToggleButton(
+              label: tr('무음'),
+              icon: m.silent ? Icons.volume_off : Icons.volume_up,
               selected: m.silent,
-              onSelected: m.setSilent,
+              onTap: () => m.setSilent(!m.silent),
             ),
-            const Spacer(),
-            OutlinedButton(onPressed: m.tap, child: const Text('TAP')),
+            SizedBox(
+              height: 56,
+              width: 120,
+              child: FilledButton.tonal(
+                onPressed: m.tap,
+                style: FilledButton.styleFrom(
+                  textStyle: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                child: const Text('TAP'),
+              ),
+            ),
           ],
         ),
         Row(
           children: [
             const Icon(Icons.volume_down, size: 18),
-            Expanded(child: Slider(value: m.volume, onChanged: m.setVolume)),
+            Expanded(
+              child: Slider(value: m.volume, onChanged: m.setVolume),
+            ),
           ],
         ),
         SizedBox(
@@ -257,26 +295,164 @@ class MetronomePanel extends ConsumerWidget {
       ],
     );
   }
+}
 
-  Future<void> _askBpm(BuildContext context, MetronomeController m) async {
-    final c = TextEditingController(text: '${m.bpm}');
-    final v = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(tr('템포')),
-        content: TextField(
-          controller: c,
+/// 템포 숫자. 누르면 그 자리에서 바로 고친다. 대화상자는 손이 멀었다.
+class _BpmField extends StatefulWidget {
+  const _BpmField({required this.metronome});
+
+  final MetronomeController metronome;
+
+  @override
+  State<_BpmField> createState() => _BpmFieldState();
+}
+
+class _BpmFieldState extends State<_BpmField> {
+  bool _editing = false;
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _begin() {
+    _controller.text = '${widget.metronome.bpm}';
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _controller.text.length,
+    );
+    setState(() => _editing = true);
+  }
+
+  void _commit() {
+    final n = int.tryParse(_controller.text.trim());
+    if (n != null) widget.metronome.setBpm(n);
+    if (mounted) setState(() => _editing = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.metronome;
+    final big = Theme.of(context).textTheme.displaySmall;
+
+    if (_editing) {
+      return SizedBox(
+        width: 120,
+        child: TextField(
+          controller: _controller,
           autofocus: true,
+          textAlign: TextAlign.center,
+          style: big,
           keyboardType: TextInputType.number,
-          onSubmitted: (v) => Navigator.pop(context, v),
+          decoration: const InputDecoration(isDense: true),
+          onSubmitted: (_) => _commit(),
+          onTapOutside: (_) => _commit(),
         ),
-        actions: [
-          FilledButton(onPressed: () => Navigator.pop(context, c.text), child: Text(tr('확인'))),
-        ],
+      );
+    }
+
+    return InkWell(
+      onTap: _begin,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          children: [
+            Text('${m.bpm}', style: big),
+            Text(m.tempoName, style: Theme.of(context).textTheme.labelMedium),
+          ],
+        ),
       ),
     );
-    final n = int.tryParse(v ?? '');
-    if (n != null) m.setBpm(n);
+  }
+}
+
+/// 이름표를 앞에 두고 내용을 옆에 놓는다.
+class _Labeled extends StatelessWidget {
+  const _Labeled({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 44,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(label, style: Theme.of(context).textTheme.labelLarge),
+          ),
+        ),
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
+/// 고르는 버튼. 골라도 크기가 변하지 않는다.
+///
+/// ChoiceChip 은 고르면 체크 표시가 끼어들어 폭이 늘고, 옆 버튼들이 밀려
+/// 줄이 흔들린다. 여기서는 색과 테두리만 바꾼다. 테두리는 모양 안쪽에
+/// 그려져 배치에 영향이 없다.
+class _ToggleButton extends StatelessWidget {
+  const _ToggleButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fg = selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    return Material(
+      color: selected
+          ? scheme.primaryContainer
+          : scheme.surfaceContainerHighest,
+      shape: StadiumBorder(
+        side: BorderSide(
+          color: selected ? scheme.primary : Colors.transparent,
+          width: 1.5,
+        ),
+      ),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 40),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 18, color: fg),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: fg,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -325,7 +501,10 @@ class _PendulumPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_PendulumPainter old) =>
-      old.position != position || old.beat != beat || old.running != running || old.beats != beats;
+      old.position != position ||
+      old.beat != beat ||
+      old.running != running ||
+      old.beats != beats;
 }
 
 // ---------------------------------------------------------------- 건반
@@ -341,21 +520,40 @@ class KeyboardPanel extends ConsumerWidget {
       children: [
         Row(
           children: [
-            IconButton(onPressed: () => k.shiftOctave(-1), icon: const Icon(Icons.chevron_left), tooltip: tr('한 옥타브 아래')),
-            Text(PitchReading.fromFrequency(PitchReading.frequencyOf(k.lowest)).label),
-            IconButton(onPressed: () => k.shiftOctave(1), icon: const Icon(Icons.chevron_right), tooltip: tr('한 옥타브 위')),
+            IconButton(
+              onPressed: () => k.shiftOctave(-1),
+              icon: const Icon(Icons.chevron_left),
+              tooltip: tr('한 옥타브 아래'),
+            ),
+            Text(
+              PitchReading.fromFrequency(
+                PitchReading.frequencyOf(k.lowest),
+              ).label,
+            ),
+            IconButton(
+              onPressed: () => k.shiftOctave(1),
+              icon: const Icon(Icons.chevron_right),
+              tooltip: tr('한 옥타브 위'),
+            ),
             const Spacer(),
             Text(tr('크기')),
             for (final n in [1, 2, 3])
               Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: ChoiceChip(label: Text(tr('{0}옥타브', [n])), selected: k.octaves == n, onSelected: (_) => k.setOctaves(n)),
+                padding: const EdgeInsets.only(left: 6),
+                child: _ToggleButton(
+                  label: tr('{0}옥타브', [n]),
+                  selected: k.octaves == n,
+                  onTap: () => k.setOctaves(n),
+                ),
               ),
           ],
         ),
         // 건반은 높을수록 짚기 쉽다. 화면 높이의 3분의 1 정도를 준다.
         SizedBox(
-          height: (MediaQuery.sizeOf(context).height * 0.34).clamp(170.0, 340.0),
+          height: (MediaQuery.sizeOf(context).height * 0.34).clamp(
+            170.0,
+            340.0,
+          ),
           child: PianoKeyboard(controller: k),
         ),
       ],
@@ -364,119 +562,165 @@ class KeyboardPanel extends ConsumerWidget {
 }
 
 /// 피아노 건반. 흰 건반을 깔고 검은 건반을 위에 얹는다.
-class PianoKeyboard extends StatelessWidget {
+///
+/// 손가락을 건반 위로 미끄러뜨리면 지나가는 건반이 차례로 울린다(글리산도).
+/// 건반마다 따로 받으면 처음 짚은 건반만 울리므로, 건반 전체에서 포인터를
+/// 받아 지금 어느 건반 위인지 직접 셈한다. 손가락 여러 개도 각각 따라간다.
+class PianoKeyboard extends StatefulWidget {
   const PianoKeyboard({super.key, required this.controller});
 
   final KeyboardController controller;
 
   @override
-  Widget build(BuildContext context) {
-    final lowest = controller.lowest;
-    final count = controller.octaves * 12 + 1;
-    final whites = <int>[];
-    for (var m = lowest; m < lowest + count; m++) {
-      if (!_isBlack(m)) whites.add(m);
-    }
+  State<PianoKeyboard> createState() => _PianoKeyboardState();
+}
 
-    return LayoutBuilder(
-      builder: (context, c) {
-        final whiteW = c.maxWidth / whites.length;
-        final blackW = whiteW * 0.62;
-        final blackH = c.maxHeight * 0.6;
+class _PianoKeyboardState extends State<PianoKeyboard> {
+  /// 포인터마다 지금 누르고 있는 건반.
+  final _under = <int, int>{};
 
-        return Stack(
-          children: [
-            Row(
-              children: [
-                for (final m in whites)
-                  Expanded(
-                    child: _Key(
-                      midi: m,
-                      black: false,
-                      pressed: controller.pressed.contains(m),
-                      label: m % 12 == 0 ? 'C${m ~/ 12 - 1}' : null,
-                      onDown: () => controller.press(m),
-                      onUp: () => controller.release(m),
-                    ),
-                  ),
-              ],
-            ),
-            for (var m = lowest; m < lowest + count; m++)
-              if (_isBlack(m))
-                Positioned(
-                  left: _blackLeft(m, lowest, whiteW) - blackW / 2,
-                  top: 0,
-                  width: blackW,
-                  height: blackH,
-                  child: _Key(
-                    midi: m,
-                    black: true,
-                    pressed: controller.pressed.contains(m),
-                    onDown: () => controller.press(m),
-                    onUp: () => controller.release(m),
-                  ),
-                ),
-          ],
-        );
-      },
-    );
-  }
+  // 마지막 배치. 포인터 자리를 건반으로 바꿀 때 쓴다.
+  late List<int> _whites;
+  late List<int> _blacks;
+  double _whiteW = 1;
+  double _blackW = 1;
+  double _blackH = 1;
 
   static bool _isBlack(int midi) => const {1, 3, 6, 8, 10}.contains(midi % 12);
 
   /// 검은 건반의 중심 x. 같은 옥타브의 흰 건반 개수를 세어 자리를 잡는다.
-  double _blackLeft(int midi, int lowest, double whiteW) {
+  double _blackCenter(int midi) {
     var whitesBefore = 0;
-    for (var m = lowest; m < midi; m++) {
+    for (var m = widget.controller.lowest; m < midi; m++) {
       if (!_isBlack(m)) whitesBefore++;
     }
     // 바로 앞 흰 건반의 오른쪽 경계. 실제 피아노처럼 C♯/F♯는 살짝 왼쪽, D♯/A♯는 살짝 오른쪽.
-    return whitesBefore * whiteW + _tweak(midi) * whiteW;
+    return whitesBefore * _whiteW + _tweak(midi) * _whiteW;
   }
 
-  double _tweak(int midi) => switch (midi % 12) {
-        1 || 6 => -0.08,
-        3 || 10 => 0.08,
-        _ => 0,
-      };
+  static double _tweak(int midi) => switch (midi % 12) {
+    1 || 6 => -0.08,
+    3 || 10 => 0.08,
+    _ => 0,
+  };
+
+  /// 이 자리에 있는 건반. 검은 건반이 흰 건반 위에 있으니 먼저 본다.
+  int? _keyAt(Offset p) {
+    if (p.dy < 0 || p.dx < 0) return null;
+    if (p.dy < _blackH) {
+      for (final m in _blacks) {
+        if ((p.dx - _blackCenter(m)).abs() <= _blackW / 2) return m;
+      }
+    }
+    final i = (p.dx / _whiteW).floor();
+    if (i < 0 || i >= _whites.length) return null;
+    return _whites[i];
+  }
+
+  void _track(int pointer, Offset position) {
+    final midi = _keyAt(position);
+    final before = _under[pointer];
+    if (midi == before) return;
+    if (before != null) widget.controller.release(before);
+    if (midi != null) {
+      _under[pointer] = midi;
+      widget.controller.press(midi);
+    } else {
+      _under.remove(pointer);
+    }
+  }
+
+  void _lift(int pointer) {
+    final midi = _under.remove(pointer);
+    if (midi != null) widget.controller.release(midi);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final lowest = controller.lowest;
+    final count = controller.octaves * 12 + 1;
+    _whites = [
+      for (var m = lowest; m < lowest + count; m++)
+        if (!_isBlack(m)) m,
+    ];
+    _blacks = [
+      for (var m = lowest; m < lowest + count; m++)
+        if (_isBlack(m)) m,
+    ];
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        _whiteW = c.maxWidth / _whites.length;
+        _blackW = _whiteW * 0.62;
+        _blackH = c.maxHeight * 0.6;
+
+        return Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: (e) => _track(e.pointer, e.localPosition),
+          onPointerMove: (e) => _track(e.pointer, e.localPosition),
+          onPointerUp: (e) => _lift(e.pointer),
+          onPointerCancel: (e) => _lift(e.pointer),
+          child: Stack(
+            children: [
+              Row(
+                children: [
+                  for (final m in _whites)
+                    Expanded(
+                      child: _Key(
+                        black: false,
+                        pressed: controller.pressed.contains(m),
+                        label: m % 12 == 0 ? 'C${m ~/ 12 - 1}' : null,
+                      ),
+                    ),
+                ],
+              ),
+              for (final m in _blacks)
+                Positioned(
+                  left: _blackCenter(m) - _blackW / 2,
+                  top: 0,
+                  width: _blackW,
+                  height: _blackH,
+                  child: _Key(
+                    black: true,
+                    pressed: controller.pressed.contains(m),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
+/// 건반 한 개의 모양. 입력은 건반 전체가 받는다.
 class _Key extends StatelessWidget {
-  const _Key({
-    required this.midi,
-    required this.black,
-    required this.pressed,
-    required this.onDown,
-    required this.onUp,
-    this.label,
-  });
+  const _Key({required this.black, required this.pressed, this.label});
 
-  final int midi;
   final bool black;
   final bool pressed;
-  final VoidCallback onDown;
-  final VoidCallback onUp;
   final String? label;
 
   @override
   Widget build(BuildContext context) {
     final base = black ? const Color(0xFF222222) : Colors.white;
     final down = black ? const Color(0xFF555555) : const Color(0xFFDDE7F5);
-    return Listener(
-      onPointerDown: (_) => onDown(),
-      onPointerUp: (_) => onUp(),
-      onPointerCancel: (_) => onUp(),
-      child: Container(
-        margin: EdgeInsets.symmetric(horizontal: black ? 0 : 1),
-        decoration: BoxDecoration(
-          color: pressed ? down : base,
-          border: Border.all(color: Colors.black54, width: 0.8),
-          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(4)),
-        ),
-        alignment: Alignment.bottomCenter,
-        padding: const EdgeInsets.only(bottom: 6),
-        child: label == null ? null : Text(label!, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: black ? 0 : 1),
+      decoration: BoxDecoration(
+        color: pressed ? down : base,
+        border: Border.all(color: Colors.black54, width: 0.8),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(4)),
       ),
+      alignment: Alignment.bottomCenter,
+      padding: const EdgeInsets.only(bottom: 6),
+      child: label == null
+          ? null
+          : Text(
+              label!,
+              style: const TextStyle(fontSize: 10, color: Colors.black54),
+            ),
     );
   }
 }
@@ -491,16 +735,19 @@ class TunerPanel extends ConsumerStatefulWidget {
 }
 
 class _TunerPanelState extends ConsumerState<TunerPanel> {
+  /// dispose 에서는 ref 를 쓸 수 없어 미리 잡아 둔다.
+  late final _tuner = ref.read(tunerProvider);
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => ref.read(tunerProvider).start());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tuner.start());
   }
 
   @override
   void dispose() {
-    // 시트를 닫으면 마이크를 놓는다. 기준음은 남겨 둔다.
-    ref.read(tunerProvider).stop();
+    // 판을 닫으면 마이크를 놓는다. 기준음은 남겨 둔다.
+    _tuner.stop();
     super.dispose();
   }
 
@@ -508,10 +755,16 @@ class _TunerPanelState extends ConsumerState<TunerPanel> {
   Widget build(BuildContext context) {
     final t = ref.watch(tunerProvider);
     final r = t.reading;
-    final displayed = r == null ? null : PitchReading.fromFrequency(r.frequency, a4: t.a4);
+    final displayed = r == null
+        ? null
+        : PitchReading.fromFrequency(r.frequency, a4: t.a4);
     final transposed = displayed == null
         ? null
-        : PitchReading(frequency: displayed.frequency, midi: displayed.midi + t.transpose, cents: displayed.cents);
+        : PitchReading(
+            frequency: displayed.frequency,
+            midi: displayed.midi + t.transpose,
+            cents: displayed.cents,
+          );
     final cents = transposed?.cents ?? 0;
     final inTune = transposed != null && cents.abs() < 5;
     final scheme = Theme.of(context).colorScheme;
@@ -544,7 +797,9 @@ class _TunerPanelState extends ConsumerState<TunerPanel> {
         ),
         Text(
           transposed?.label ?? '—',
-          style: Theme.of(context).textTheme.displayMedium?.copyWith(color: inTune ? Colors.green : null),
+          style: Theme.of(context).textTheme.displayMedium?.copyWith(
+            color: inTune ? Colors.green : null,
+          ),
         ),
         Text(
           transposed == null
@@ -552,56 +807,47 @@ class _TunerPanelState extends ConsumerState<TunerPanel> {
               : '${transposed.frequency.toStringAsFixed(1)} Hz · ${cents >= 0 ? '+' : ''}${cents.toStringAsFixed(0)}¢',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
+        const SizedBox(height: 12),
 
-        // 평소에는 음 이름과 바늘만 본다. 기준음·이조·A4 는 한 번 정하면
-        // 거의 손대지 않으므로 접어 둔다.
-        Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            childrenPadding: const EdgeInsets.only(bottom: 8),
-            title: Text(tr('세부 설정'), style: Theme.of(context).textTheme.labelLarge),
-            subtitle: Text(
-              'A4 ${t.a4.round()} Hz · ${_transposeName(t.transpose)}',
-              style: Theme.of(context).textTheme.bodySmall,
+        // 조옮김 악기(B♭ 클라리넷 등)는 읽은 음을 그 악기 기준으로 보여 준다.
+        Row(
+          children: [
+            Text(tr('조옮김'), style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(width: 12),
+            DropdownButton<int>(
+              value: t.transpose,
+              onChanged: (v) {
+                if (v != null) t.setTranspose(v);
+              },
+              items: [
+                for (final semi in [0, -2, -9, -7])
+                  DropdownMenuItem(
+                    value: semi,
+                    child: Text(_transposeName(semi)),
+                  ),
+              ],
             ),
-            children: [
-              Row(
-                children: [
-                  Text('A4 = ${t.a4.round()} Hz'),
-                  Expanded(child: Slider(value: t.a4, min: 415, max: 466, divisions: 51, onChanged: t.setA4)),
-                ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(tr('기준음'), style: Theme.of(context).textTheme.labelLarge),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final midi in [57, 60, 62, 64, 65, 67, 69, 71, 72])
+              _ToggleButton(
+                label: PitchReading.fromFrequency(
+                  PitchReading.frequencyOf(midi),
+                ).label,
+                selected: t.pipeMidi == midi,
+                onTap: () => t.togglePipe(midi),
               ),
-              Row(
-                children: [
-                  Text(tr('이조')),
-                  const SizedBox(width: 8),
-                  for (final (semi, name) in [(0, 'C'), (-2, 'B♭'), (-9, 'E♭'), (-7, 'F')])
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: ChoiceChip(label: Text(name), selected: t.transpose == semi, onSelected: (_) => t.setTranspose(semi)),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(tr('기준음'), style: Theme.of(context).textTheme.labelLarge),
-              ),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 6,
-                children: [
-                  for (final midi in [57, 60, 62, 64, 65, 67, 69, 71, 72])
-                    FilterChip(
-                      label: Text(PitchReading.fromFrequency(PitchReading.frequencyOf(midi)).label),
-                      selected: t.pipeMidi == midi,
-                      onSelected: (_) => t.togglePipe(midi),
-                    ),
-                ],
-              ),
-            ],
-          ),
+          ],
         ),
       ],
     );
@@ -609,11 +855,11 @@ class _TunerPanelState extends ConsumerState<TunerPanel> {
 }
 
 String _transposeName(int semi) => switch (semi) {
-      -2 => 'B♭',
-      -9 => 'E♭',
-      -7 => 'F',
-      _ => 'C',
-    };
+  -2 => 'B♭',
+  -9 => 'E♭',
+  -7 => 'F',
+  _ => 'C',
+};
 
 class _TunerGaugePainter extends CustomPainter {
   _TunerGaugePainter({required this.cents, required this.color});
@@ -628,7 +874,11 @@ class _TunerGaugePainter extends CustomPainter {
     final axis = Paint()
       ..color = Colors.grey
       ..strokeWidth = 2;
-    canvas.drawLine(Offset(cx - half, baseline), Offset(cx + half, baseline), axis);
+    canvas.drawLine(
+      Offset(cx - half, baseline),
+      Offset(cx + half, baseline),
+      axis,
+    );
     for (var c = -50; c <= 50; c += 10) {
       final x = cx + c / 50 * half;
       final h = c == 0 ? 18.0 : (c % 25 == 0 ? 12.0 : 7.0);
@@ -645,7 +895,8 @@ class _TunerGaugePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_TunerGaugePainter old) => old.cents != cents || old.color != color;
+  bool shouldRepaint(_TunerGaugePainter old) =>
+      old.cents != cents || old.color != color;
 }
 
 // ---------------------------------------------------------------- 녹음기
@@ -665,14 +916,21 @@ class RecorderPanel extends ConsumerWidget {
       height: MediaQuery.sizeOf(context).height * 0.6,
       child: Column(
         children: [
-          if (r.error != null) Text(r.error!, style: TextStyle(color: scheme.error)),
+          if (r.error != null)
+            Text(r.error!, style: TextStyle(color: scheme.error)),
           Row(
             children: [
               FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: r.recording ? scheme.error : null),
+                style: FilledButton.styleFrom(
+                  backgroundColor: r.recording ? scheme.error : null,
+                ),
                 onPressed: r.recording ? r.stop : r.start,
-                icon: Icon(r.recording ? Icons.stop : Icons.fiber_manual_record),
-                label: Text(r.recording ? tr('정지 {0}', [_fmt(r.elapsed)]) : tr('녹음')),
+                icon: Icon(
+                  r.recording ? Icons.stop : Icons.fiber_manual_record,
+                ),
+                label: Text(
+                  r.recording ? tr('정지 {0}', [_fmt(r.elapsed)]) : tr('녹음'),
+                ),
               ),
               SizedBox(width: 12),
               Expanded(
@@ -699,16 +957,29 @@ class RecorderPanel extends ConsumerWidget {
                           ListTile(
                             leading: IconButton.filledTonal(
                               onPressed: () => r.play(rec),
-                              icon: Icon(playing && !r.isPaused ? Icons.pause : Icons.play_arrow),
+                              icon: Icon(
+                                playing && !r.isPaused
+                                    ? Icons.pause
+                                    : Icons.play_arrow,
+                              ),
                             ),
-                            title: Text(rec.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: Text(_fmt(Duration(milliseconds: rec.durationMs))),
+                            title: Text(
+                              rec.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              _fmt(Duration(milliseconds: rec.durationMs)),
+                            ),
                             trailing: PopupMenuButton<String>(
                               onSelected: (v) async {
                                 switch (v) {
                                   case 'share':
                                     await SharePlus.instance.share(
-                                      ShareParams(files: [XFile(r.fileOf(rec).path)], subject: rec.title),
+                                      ShareParams(
+                                        files: [XFile(r.fileOf(rec).path)],
+                                        subject: rec.title,
+                                      ),
                                     );
                                   case 'rename':
                                     final name = await _ask(context, rec.title);
@@ -718,9 +989,18 @@ class RecorderPanel extends ConsumerWidget {
                                 }
                               },
                               itemBuilder: (context) => [
-                                PopupMenuItem(value: 'share', child: Text(tr('공유 / 내보내기'))),
-                                PopupMenuItem(value: 'rename', child: Text(tr('이름 바꾸기'))),
-                                PopupMenuItem(value: 'delete', child: Text(tr('지우기'))),
+                                PopupMenuItem(
+                                  value: 'share',
+                                  child: Text(tr('공유 / 내보내기')),
+                                ),
+                                PopupMenuItem(
+                                  value: 'rename',
+                                  child: Text(tr('이름 바꾸기')),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text(tr('지우기')),
+                                ),
                               ],
                             ),
                           ),
@@ -728,9 +1008,18 @@ class RecorderPanel extends ConsumerWidget {
                             Slider(
                               value: r.playPosition.inMilliseconds
                                   .toDouble()
-                                  .clamp(0.0, r.playLength.inMilliseconds.toDouble().clamp(1.0, double.infinity)),
-                              max: r.playLength.inMilliseconds.toDouble().clamp(1.0, double.infinity),
-                              onChanged: (v) => r.seek(Duration(milliseconds: v.round())),
+                                  .clamp(
+                                    0.0,
+                                    r.playLength.inMilliseconds
+                                        .toDouble()
+                                        .clamp(1.0, double.infinity),
+                                  ),
+                              max: r.playLength.inMilliseconds.toDouble().clamp(
+                                1.0,
+                                double.infinity,
+                              ),
+                              onChanged: (v) =>
+                                  r.seek(Duration(milliseconds: v.round())),
                             ),
                         ],
                       );
@@ -750,8 +1039,14 @@ class RecorderPanel extends ConsumerWidget {
         title: Text(tr('이름')),
         content: TextField(controller: c, autofocus: true),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('취소'))),
-          FilledButton(onPressed: () => Navigator.pop(context, c.text.trim()), child: Text(tr('확인'))),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(tr('취소')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, c.text.trim()),
+            child: Text(tr('확인')),
+          ),
         ],
       ),
     );
@@ -777,18 +1072,37 @@ class PlayerPanel extends ConsumerWidget {
       child: Column(
         children: [
           if (p.current != null) ...[
-            Text(p.current!.title, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              p.current!.title,
+              style: Theme.of(context).textTheme.titleMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             Slider(
-              value: p.position.inMilliseconds.toDouble().clamp(0, length < 1 ? 1 : length),
+              value: p.position.inMilliseconds.toDouble().clamp(
+                0,
+                length < 1 ? 1 : length,
+              ),
               max: length < 1 ? 1 : length,
               onChanged: (v) => p.seek(Duration(milliseconds: v.round())),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(onPressed: () => p.seek(p.position - const Duration(seconds: 10)), icon: const Icon(Icons.replay_10)),
-                IconButton.filled(onPressed: p.togglePause, icon: Icon(p.isPlaying ? Icons.pause : Icons.play_arrow)),
-                IconButton(onPressed: () => p.seek(p.position + const Duration(seconds: 10)), icon: const Icon(Icons.forward_10)),
+                IconButton(
+                  onPressed: () =>
+                      p.seek(p.position - const Duration(seconds: 10)),
+                  icon: const Icon(Icons.replay_10),
+                ),
+                IconButton.filled(
+                  onPressed: p.togglePause,
+                  icon: Icon(p.isPlaying ? Icons.pause : Icons.play_arrow),
+                ),
+                IconButton(
+                  onPressed: () =>
+                      p.seek(p.position + const Duration(seconds: 10)),
+                  icon: const Icon(Icons.forward_10),
+                ),
                 IconButton(onPressed: p.stop, icon: const Icon(Icons.stop)),
                 IconButton(
                   onPressed: () => p.setLoop(!p.loop),
@@ -801,7 +1115,9 @@ class PlayerPanel extends ConsumerWidget {
             Row(
               children: [
                 const Icon(Icons.volume_down, size: 18),
-                Expanded(child: Slider(value: p.volume, onChanged: p.setVolume)),
+                Expanded(
+                  child: Slider(value: p.volume, onChanged: p.setVolume),
+                ),
               ],
             ),
             const Divider(),
@@ -814,7 +1130,9 @@ class PlayerPanel extends ConsumerWidget {
                 onPressed: () async {
                   final n = await p.pickAndAdd();
                   if (context.mounted && n > 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('{0}개를 추가했습니다', [n]))));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(tr('{0}개를 추가했습니다', [n]))),
+                    );
                   }
                 },
                 icon: const Icon(Icons.add),
@@ -831,8 +1149,14 @@ class PlayerPanel extends ConsumerWidget {
                       final t = p.tracks[i];
                       final cur = p.current?.path == t.path;
                       return ListTile(
-                        leading: Icon(cur ? Icons.equalizer : Icons.audiotrack_outlined),
-                        title: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        leading: Icon(
+                          cur ? Icons.equalizer : Icons.audiotrack_outlined,
+                        ),
+                        title: Text(
+                          t.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         selected: cur,
                         trailing: IconButton(
                           icon: const Icon(Icons.delete_outline),
@@ -848,4 +1172,3 @@ class PlayerPanel extends ConsumerWidget {
     );
   }
 }
-
