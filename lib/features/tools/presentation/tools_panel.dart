@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/db/database.dart';
+import '../../../core/layout/center_sheet.dart';
+import '../../../core/layout/floating_window.dart';
 import '../domain/keyboard.dart';
 import '../domain/metronome.dart';
 import '../domain/music_player.dart';
@@ -24,23 +26,80 @@ enum MusicTool {
   final IconData icon;
 }
 
-/// 도구 하나를 바닥 시트로 연다. 시트를 닫아도 메트로놈과 재생은 계속된다.
+Widget _toolBody(MusicTool tool, String? scoreId) => switch (tool) {
+      MusicTool.metronome => const MetronomePanel(),
+      MusicTool.keyboard => const KeyboardPanel(),
+      MusicTool.tuner => const TunerPanel(),
+      MusicTool.recorder => RecorderPanel(scoreId: scoreId),
+      MusicTool.player => const PlayerPanel(),
+    };
+
+/// 도구 하나를 연다. 닫아도 메트로놈과 재생은 계속된다.
+///
+/// 건반만 바닥 시트로 둔다. 건반은 화면 아래 폭을 다 써야 짚을 만하고,
+/// 손이 가는 자리도 아래쪽이다. 나머지는 가운데 판으로 연다.
 Future<void> showMusicTool(BuildContext context, MusicTool tool, {String? scoreId}) {
+  // 닫은 뒤에도 창을 띄워야 하므로 부르는 쪽 context 를 들고 있는다.
+  final host = context;
+
+  Widget body(BuildContext inner) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  tr(tool.label),
+                  style: Theme.of(inner).textTheme.titleMedium,
+                ),
+              ),
+              IconButton(
+                tooltip: tr('별도 창으로 띄우기'),
+                icon: const Icon(Icons.open_in_new),
+                onPressed: () {
+                  Navigator.pop(inner);
+                  openMusicToolWindow(host, tool, scoreId: scoreId);
+                },
+              ),
+            ],
+          ),
+          _toolBody(tool, scoreId),
+        ],
+      );
+
+  if (tool != MusicTool.keyboard) {
+    return showCenterSheet<void>(
+      context,
+      maxWidth: 480,
+      child: Builder(builder: body),
+    );
+  }
+
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (context) => Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: switch (tool) {
-        MusicTool.metronome => const MetronomePanel(),
-        MusicTool.keyboard => const KeyboardPanel(),
-        MusicTool.tuner => const TunerPanel(),
-        MusicTool.recorder => RecorderPanel(scoreId: scoreId),
-        MusicTool.player => const PlayerPanel(),
-      },
+    // 넓은 화면에서 기본 640pt 로 묶이면 건반이 좁아진다. 화면을 그대로 쓴다.
+    constraints: const BoxConstraints(maxWidth: double.infinity),
+    builder: (sheetContext) => Padding(
+      // 건반은 좌우 끝까지 쓰는 편이 짚기 좋다.
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+      child: body(sheetContext),
     ),
+  );
+}
+
+/// 도구를 악보 위에 떠 있는 창으로 연다. 악보를 보면서 쓸 수 있다.
+void openMusicToolWindow(BuildContext context, MusicTool tool, {String? scoreId}) {
+  showFloatingWindow(
+    context: context,
+    title: tr(tool.label),
+    // 건반은 옆으로 넓어야 짚을 만하다.
+    initialSize: tool == MusicTool.keyboard
+        ? const Size(640, 300)
+        : const Size(430, 400),
+    builder: (context, close) => _toolBody(tool, scoreId),
   );
 }
 
@@ -74,11 +133,17 @@ class ToolRail extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             for (final t in MusicTool.values)
-              IconButton(
-                tooltip: tr(t.label),
-                isSelected: active(t),
-                icon: Icon(t.icon),
-                onPressed: () => showMusicTool(context, t, scoreId: scoreId),
+              // 도구는 악보를 보면서 쓰는 것이라 바로 떠 있는 창으로 연다.
+              // 길게 누르면 예전처럼 판으로 연다.
+              GestureDetector(
+                onLongPress: () => showMusicTool(context, t, scoreId: scoreId),
+                child: IconButton(
+                  tooltip: tr(t.label),
+                  isSelected: active(t),
+                  icon: Icon(t.icon),
+                  onPressed: () =>
+                      openMusicToolWindow(context, t, scoreId: scoreId),
+                ),
               ),
           ],
         ),
@@ -288,8 +353,9 @@ class KeyboardPanel extends ConsumerWidget {
               ),
           ],
         ),
+        // 건반은 높을수록 짚기 쉽다. 화면 높이의 3분의 1 정도를 준다.
         SizedBox(
-          height: 170,
+          height: (MediaQuery.sizeOf(context).height * 0.34).clamp(170.0, 340.0),
           child: PianoKeyboard(controller: k),
         ),
       ],
@@ -458,11 +524,22 @@ class _TunerPanelState extends ConsumerState<TunerPanel> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(t.error!, style: TextStyle(color: scheme.error)),
           ),
-        SizedBox(
-          height: 120,
-          child: CustomPaint(
-            size: const Size(double.infinity, 120),
-            painter: _TunerGaugePainter(cents: transposed == null ? null : cents, color: inTune ? Colors.green : scheme.primary),
+
+        // 바늘은 읽은 값으로 바로 튀지 않고 이전 자리에서 미끄러져 간다.
+        // 음정 검출은 프레임마다 조금씩 흔들려서 그대로 그리면 떨린다.
+        TweenAnimationBuilder<double>(
+          tween: Tween(end: cents.clamp(-50.0, 50.0)),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, _) => SizedBox(
+            height: 132,
+            child: CustomPaint(
+              size: const Size(double.infinity, 132),
+              painter: _TunerGaugePainter(
+                cents: transposed == null ? null : value,
+                color: inTune ? Colors.green : scheme.primary,
+              ),
+            ),
           ),
         ),
         Text(
@@ -470,47 +547,73 @@ class _TunerPanelState extends ConsumerState<TunerPanel> {
           style: Theme.of(context).textTheme.displayMedium?.copyWith(color: inTune ? Colors.green : null),
         ),
         Text(
-          transposed == null ? tr('소리를 내 보세요') : '${transposed.frequency.toStringAsFixed(1)} Hz · ${cents >= 0 ? '+' : ''}${cents.toStringAsFixed(0)}¢',
+          transposed == null
+              ? tr('소리를 내 보세요')
+              : '${transposed.frequency.toStringAsFixed(1)} Hz · ${cents >= 0 ? '+' : ''}${cents.toStringAsFixed(0)}¢',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Text('A4 = ${t.a4.round()} Hz'),
-            Expanded(child: Slider(value: t.a4, min: 415, max: 466, divisions: 51, onChanged: t.setA4)),
-          ],
-        ),
-        Row(
-          children: [
-            Text(tr('이조')),
-            const SizedBox(width: 8),
-            for (final (semi, name) in [(0, 'C'), (-2, 'B♭'), (-9, 'E♭'), (-7, 'F')])
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: ChoiceChip(label: Text(name), selected: t.transpose == semi, onSelected: (_) => t.setTranspose(semi)),
+
+        // 평소에는 음 이름과 바늘만 본다. 기준음·이조·A4 는 한 번 정하면
+        // 거의 손대지 않으므로 접어 둔다.
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(bottom: 8),
+            title: Text(tr('세부 설정'), style: Theme.of(context).textTheme.labelLarge),
+            subtitle: Text(
+              'A4 ${t.a4.round()} Hz · ${_transposeName(t.transpose)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            children: [
+              Row(
+                children: [
+                  Text('A4 = ${t.a4.round()} Hz'),
+                  Expanded(child: Slider(value: t.a4, min: 415, max: 466, divisions: 51, onChanged: t.setA4)),
+                ],
               ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(tr('기준음'), style: Theme.of(context).textTheme.labelLarge),
-        ),
-        Wrap(
-          spacing: 6,
-          children: [
-            for (final midi in [57, 60, 62, 64, 65, 67, 69, 71, 72])
-              FilterChip(
-                label: Text(PitchReading.fromFrequency(PitchReading.frequencyOf(midi)).label),
-                selected: t.pipeMidi == midi,
-                onSelected: (_) => t.togglePipe(midi),
+              Row(
+                children: [
+                  Text(tr('이조')),
+                  const SizedBox(width: 8),
+                  for (final (semi, name) in [(0, 'C'), (-2, 'B♭'), (-9, 'E♭'), (-7, 'F')])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(label: Text(name), selected: t.transpose == semi, onSelected: (_) => t.setTranspose(semi)),
+                    ),
+                ],
               ),
-          ],
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(tr('기준음'), style: Theme.of(context).textTheme.labelLarge),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                children: [
+                  for (final midi in [57, 60, 62, 64, 65, 67, 69, 71, 72])
+                    FilterChip(
+                      label: Text(PitchReading.fromFrequency(PitchReading.frequencyOf(midi)).label),
+                      selected: t.pipeMidi == midi,
+                      onSelected: (_) => t.togglePipe(midi),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 }
+
+String _transposeName(int semi) => switch (semi) {
+      -2 => 'B♭',
+      -9 => 'E♭',
+      -7 => 'F',
+      _ => 'C',
+    };
 
 class _TunerGaugePainter extends CustomPainter {
   _TunerGaugePainter({required this.cents, required this.color});
