@@ -73,36 +73,50 @@ class _ScoreTabBarState extends ConsumerState<ScoreTabBar> {
       color: widget.background ?? scheme.surfaceContainerHighest,
       child: SizedBox(
         height: 40,
-        child: ListView.separated(
-          controller: _controller,
+        // 길게 눌러 끌면 순서가 바뀐다. 자주 오가는 곡을 앞으로 모아 둘 수 있다.
+        child: ReorderableListView.builder(
+          scrollController: _controller,
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           itemCount: tabs.length,
-          separatorBuilder: (context, _) => const SizedBox(width: 4),
+          onReorderItem: (from, to) =>
+              ref.read(openTabsProvider.notifier).move(from, to),
+          // 끌고 있는 탭은 살짝 떠 보이게만 한다. 기본 장식은 각지고 크다.
+          proxyDecorator: (child, index, animation) => Material(
+            color: Colors.transparent,
+            elevation: 6,
+            borderRadius: BorderRadius.circular(8),
+            child: child,
+          ),
           itemBuilder: (context, i) {
             final tab = tabs[i];
             final selected = tab.key == widget.current;
-            return _Tab(
-              key: selected ? _currentKey : ValueKey(tab.key),
-              tab: tab,
-              selected: selected,
-              onTap: () {
-                if (selected) return;
-                final onSelect = widget.onSelect;
-                if (onSelect != null) {
-                  onSelect(tab);
-                } else {
-                  context.push('${tab.location}?page=${tab.page}');
-                }
-              },
-              onClose: () {
-                final onClose = widget.onClose;
-                if (onClose != null) {
-                  onClose(tab);
-                } else {
-                  ref.read(openTabsProvider.notifier).close(tab.key);
-                }
-              },
+            return Padding(
+              // 자리 이동에 쓰는 열쇠는 고른 것과 무관하게 늘 같아야 한다.
+              key: ValueKey(tab.key),
+              padding: const EdgeInsets.only(right: 4),
+              child: _Tab(
+                key: selected ? _currentKey : null,
+                tab: tab,
+                selected: selected,
+                onTap: () {
+                  if (selected) return;
+                  final onSelect = widget.onSelect;
+                  if (onSelect != null) {
+                    onSelect(tab);
+                  } else {
+                    context.push('${tab.location}?page=${tab.page}');
+                  }
+                },
+                onClose: () {
+                  final onClose = widget.onClose;
+                  if (onClose != null) {
+                    onClose(tab);
+                  } else {
+                    ref.read(openTabsProvider.notifier).close(tab.key);
+                  }
+                },
+              ),
             );
           },
         ),
@@ -153,9 +167,9 @@ class _Tab extends StatelessWidget {
                   tab.title,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: fg,
-                        fontWeight: selected ? FontWeight.w600 : null,
-                      ),
+                    color: fg,
+                    fontWeight: selected ? FontWeight.w600 : null,
+                  ),
                 ),
               ),
               IconButton(

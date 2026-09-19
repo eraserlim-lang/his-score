@@ -61,6 +61,10 @@ class ViewerState {
 
   int get spreadStep => layout == PageLayout.dual && !dualStepOne ? 2 : 1;
 
+  /// 한 장씩 미는 2페이지 보기. 페이지를 한 줄로 이어 붙여 반 화면씩 밀기
+  /// 때문에 묶음이 통째로 갈리는 것을 전제로 한 넘김 효과는 쓸 수 없다.
+  bool get slidesOnePage => layout == PageLayout.dual && dualStepOne;
+
   bool get canGoNext => pageIndex + spreadStep < pageCount;
   bool get canGoPrevious => pageIndex > 0;
 

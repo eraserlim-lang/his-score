@@ -58,6 +58,17 @@ class OpenTabs extends Notifier<List<OpenTab>> {
     state = [...state]..[i] = state[i].copyWith(page: page);
   }
 
+  /// 탭을 끌어 옮긴 자리로 옮긴다.
+  ///
+  /// [newIndex] 는 빼낸 뒤 기준이다(ReorderableListView 의 onReorderItem).
+  void move(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= state.length) return;
+    final next = [...state];
+    final tab = next.removeAt(oldIndex);
+    next.insert(newIndex.clamp(0, next.length), tab);
+    state = next;
+  }
+
   void close(SessionKey key) {
     if (!state.any((t) => t.key == key)) return;
     state = [for (final t in state) if (t.key != key) t];

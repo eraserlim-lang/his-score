@@ -132,7 +132,7 @@ class _ScorePageViewState extends State<ScorePageView> {
           );
         } else {
           body = CustomPaint(
-            painter: _PagePainter(
+            painter: PagePainter(
               image: image,
               crop: widget.page.crop,
               rotation: widget.page.rotation,
@@ -168,8 +168,12 @@ class _ScorePageViewState extends State<ScorePageView> {
   }
 }
 
-class _PagePainter extends CustomPainter {
-  _PagePainter({
+/// 구워진 페이지 이미지를 잘라내고 돌려 그린다.
+///
+/// 화면의 페이지가 쓰고, 종이 넘김이 스냅샷을 뜨지 못할 때 같은 모습을
+/// 캐시 이미지로 다시 만드는 데도 쓴다.
+class PagePainter extends CustomPainter {
+  PagePainter({
     required this.image,
     required this.crop,
     required this.rotation,
@@ -209,6 +213,6 @@ class _PagePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PagePainter old) =>
+  bool shouldRepaint(PagePainter old) =>
       old.image != image || old.crop != crop || old.rotation != rotation;
 }

@@ -59,6 +59,12 @@ class ViewerToolbar extends StatelessWidget {
                 )
               else
                 const Spacer(),
+              // 북마크는 자주 쓴다. 메뉴 속에 묻어 두지 않고 막대에 내놓는다.
+              IconButton(
+                tooltip: tr('북마크'),
+                icon: const Icon(Icons.bookmark_border),
+                onPressed: () => onPageMenu('bookmarks'),
+              ),
               PopupMenuButton<String>(
                 tooltip: tr('페이지 도구'),
                 icon: const Icon(Icons.auto_stories_outlined),
@@ -79,6 +85,10 @@ class ViewerToolbar extends StatelessWidget {
                   PopupMenuItem(
                     value: 'jumps',
                     child: ListTile(leading: Icon(Icons.call_missed_outgoing), title: Text(tr('점프 버튼 편집'))),
+                  ),
+                  PopupMenuItem(
+                    value: 'savePage',
+                    child: ListTile(leading: Icon(Icons.file_download_outlined), title: Text(tr('이 페이지 저장'))),
                   ),
                   PopupMenuItem(
                     value: 'export',
@@ -105,16 +115,21 @@ class ViewerToolbar extends StatelessWidget {
                       checked: state.animation == TurnAnimation.slide,
                       child: Text(tr('넘김: 밀기')),
                     ),
-                    CheckedPopupMenuItem(
-                      value: 'anim_stack',
-                      checked: state.animation == TurnAnimation.stack,
-                      child: Text(tr('넘김: 쌓기')),
-                    ),
-                    CheckedPopupMenuItem(
-                      value: 'anim_curl',
-                      checked: state.animation == TurnAnimation.curl,
-                      child: Text(tr('넘김: 넘기기')),
-                    ),
+                    // 한 장씩 미는 2페이지 보기는 페이지를 한 줄로 이어
+                    // 붙여 민다. 묶음이 통째로 갈리는 것을 전제로 만든
+                    // 쌓기와 넘기기는 그 띠와 맞지 않아 내놓지 않는다.
+                    if (!state.slidesOnePage) ...[
+                      CheckedPopupMenuItem(
+                        value: 'anim_stack',
+                        checked: state.animation == TurnAnimation.stack,
+                        child: Text(tr('넘김: 쌓기')),
+                      ),
+                      CheckedPopupMenuItem(
+                        value: 'anim_curl',
+                        checked: state.animation == TurnAnimation.curl,
+                        child: Text(tr('넘김: 넘기기')),
+                      ),
+                    ],
                   ],
                 ],
               ),

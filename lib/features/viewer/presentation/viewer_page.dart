@@ -27,6 +27,7 @@ import '../domain/open_tabs.dart';
 import '../domain/spreads.dart';
 import '../domain/viewer_controller.dart';
 import 'pages/page_order_page.dart';
+import 'sheets/add_to_setlist_sheet.dart';
 import 'sheets/bookmarks_sheet.dart';
 import 'sheets/crop_sheet.dart';
 import 'widgets/jump_layer.dart';
@@ -56,7 +57,7 @@ class _ViewerPageState extends ConsumerState<ViewerPage> {
     final session = ref.watch(scoreSessionProvider(widget.sessionKey));
 
     return Scaffold(
-      backgroundColor: ViewerColors.canvas,
+      backgroundColor: ViewerColors.canvasOf(Theme.of(context).brightness),
       body: session.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _ErrorView(message: '$e'),
@@ -95,6 +96,9 @@ class _ViewerBody extends ConsumerStatefulWidget {
 class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   late final ViewerController _controller;
   late final InkStore _inkStore;
+
+  /// dispose 에서는 ref 를 쓸 수 없어 미리 잡아 둔다.
+  late final FaceTurnService _faceTurn;
   final _tools = AnnotationToolState();
   bool _chromeVisible = true;
 
@@ -127,6 +131,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       ..addListener(_persistViewSettings);
 
     _inkStore = InkStore(ref.read(annotationDaoProvider));
+    _faceTurn = ref.read(faceTurnServiceProvider);
 
     // 페달, 얼굴 제스처, 리모컨, 리드 기기가 보내는 명령을 받는다.
     _hub = ref.read(turnInputHubProvider)..viewerOpen = true;
@@ -191,7 +196,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     _hubSub?.cancel();
     _remoteSub?.cancel();
     _hub.viewerOpen = false;
-    ref.read(faceTurnServiceProvider).stop();
+    _faceTurn.stop();
     _controller.dispose();
     _tools.dispose();
     // 저장 큐를 비운 뒤 정리한다. 마지막 획이 사라지면 안 된다.
@@ -302,6 +307,81 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
 
   ViewPage get _currentPage => widget.session.pages[_controller.state.pageIndex];
 
+  /// 곡 안에서 몇 번째 쪽을 보고 있는지(0-based, 보이는 순서 기준).
+  ///
+  /// 내보내기와 세트리스트는 곡 단위로 센다. 세트리스트를 보는 중이면
+  /// 세션 전체 번호와 다르다.
+  int get _pageIndexWithinScore {
+    final page = _currentPage;
+    final within = widget.session.pages
+        .where((p) => p.scoreId == page.scoreId)
+        .toList()
+        .indexWhere((p) => p.index == page.index);
+    return within < 0 ? 0 : within;
+  }
+
+  /// 페이지를 길게 누르면 도구 막대를 거치지 않고 그 자리에서 페이지 도구를 연다.
+  /// 연주 중에는 화면 위쪽 막대까지 손이 가지 않는다.
+  Future<void> _showPageActions(Offset globalPosition) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        globalPosition & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'bookmarks',
+          child: ListTile(
+            leading: const Icon(Icons.bookmark_border),
+            title: Text(tr('북마크')),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'crop',
+          child: ListTile(
+            leading: const Icon(Icons.crop),
+            title: Text(tr('여백·기울기 조정')),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'order',
+          child: ListTile(
+            leading: const Icon(Icons.reorder),
+            title: Text(tr('페이지 순서 편집')),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'jumps',
+          child: ListTile(
+            leading: const Icon(Icons.call_missed_outgoing),
+            title: Text(tr('점프 버튼 편집')),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'savePage',
+          child: ListTile(
+            leading: const Icon(Icons.file_download_outlined),
+            title: Text(tr('이 페이지 저장')),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'addToSetlist',
+          child: ListTile(
+            leading: const Icon(Icons.playlist_add),
+            title: Text(tr('세트리스트에 넣기')),
+          ),
+        ),
+      ],
+    );
+    if (action == null || !mounted) return;
+    await _openPageMenu(action);
+  }
+
   Future<void> _openPageMenu(String action) async {
     final state = _controller.state;
     switch (action) {
@@ -317,6 +397,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
           context,
           session: widget.session,
           current: _currentPage,
+          onSaved: _reloadSession,
         );
         if (saved) _reloadSession();
       case 'order':
@@ -333,6 +414,18 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       case 'jumps':
         _controller.setEditingJumps(true);
         setState(() => _chromeVisible = false);
+      case 'savePage':
+        await showPageSaveSheet(
+          context,
+          score: widget.session.scoreOf(_currentPage),
+          pageIndex: _pageIndexWithinScore,
+        );
+      case 'addToSetlist':
+        await showAddToSetlistSheet(
+          context,
+          score: widget.session.scoreOf(_currentPage),
+          pageIndex: _pageIndexWithinScore,
+        );
       case 'export':
         final score = widget.session.scoreOf(_currentPage);
         await showExportSheet(
@@ -485,7 +578,12 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                 children: [
                   Positioned.fill(child: _buildContent(state)),
                   if (!state.overlayEditing)
-                    Positioned.fill(child: _TapZones(onTap: _handleTap)),
+                    Positioned.fill(
+                      child: _TapZones(
+                        onTap: _handleTap,
+                        onLongPress: _showPageActions,
+                      ),
+                    ),
                   if (state.editingJumps)
                     Positioned(
                       top: MediaQuery.paddingOf(context).top + 8,
@@ -647,9 +745,12 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
 enum _TapZone { firstPage, previous, next, center }
 
 class _TapZones extends StatelessWidget {
-  const _TapZones({required this.onTap});
+  const _TapZones({required this.onTap, this.onLongPress});
 
   final ValueChanged<_TapZone> onTap;
+
+  /// 길게 누른 화면 위치(전역 좌표). 그 자리에 페이지 도구를 연다.
+  final ValueChanged<Offset>? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -671,6 +772,9 @@ class _TapZones extends StatelessWidget {
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTap: () => onTap(_TapZone.previous),
+                  onLongPressStart: onLongPress == null
+                      ? null
+                      : (d) => onLongPress!(d.globalPosition),
                 ),
               ),
             ),
@@ -685,6 +789,9 @@ class _TapZones extends StatelessWidget {
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTap: () => onTap(_TapZone.next),
+                  onLongPressStart: onLongPress == null
+                      ? null
+                      : (d) => onLongPress!(d.globalPosition),
                 ),
               ),
             ),
@@ -699,6 +806,9 @@ class _TapZones extends StatelessWidget {
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTap: () => onTap(_TapZone.center),
+                  onLongPressStart: onLongPress == null
+                      ? null
+                      : (d) => onLongPress!(d.globalPosition),
                 ),
               ),
             ),
@@ -745,12 +855,8 @@ class _TopBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ScoreTabBar(
-              current: sessionKey,
-              onSelect: onSelectTab,
-              onClose: onCloseTab,
-              background: Colors.transparent,
-            ),
+            // 제목 줄이 위, 악보 탭이 그 아래다. 브라우저와 같은 차례라
+            // 뒤로 가기와 제목을 먼저 만나고 탭은 악보 가까이 붙는다.
             SizedBox(
               height: 56,
               child: Row(
@@ -772,6 +878,12 @@ class _TopBar extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            ScoreTabBar(
+              current: sessionKey,
+              onSelect: onSelectTab,
+              onClose: onCloseTab,
+              background: Colors.transparent,
             ),
           ],
         ),

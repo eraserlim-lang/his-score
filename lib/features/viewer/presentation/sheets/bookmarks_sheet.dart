@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/page_tools_dao.dart';
 import '../../data/score_session.dart';
+import '../../../../core/layout/center_sheet.dart';
 import '../../../../core/i18n/tr.dart';
 
 /// 북마크 목록. 현재 페이지 추가, PDF 목차 가져오기, 이름 바꾸기, 지우기.
@@ -14,15 +15,13 @@ Future<void> showBookmarksSheet(
   required ViewPage current,
   required ValueChanged<int> onJump,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (context) => FractionallySizedBox(
-      heightFactor: 0.7,
-      child: _BookmarksBody(session: session, current: current, onJump: onJump),
-    ),
+  return showCenterSheet<void>(
+    context,
+    maxWidth: 520,
+    // 목록이 안에서 스스로 스크롤한다.
+    fill: true,
+    scrollable: false,
+    child: _BookmarksBody(session: session, current: current, onJump: onJump),
   );
 }
 
