@@ -85,12 +85,20 @@ class ViewerToolbar extends StatelessWidget {
                     child: ListTile(leading: Icon(Icons.ios_share), title: Text(tr('내보내기 · 인쇄'))),
                   ),
                   const PopupMenuDivider(),
-                  if (state.layout == PageLayout.dual)
+                  if (state.layout == PageLayout.dual) ...[
                     CheckedPopupMenuItem(
-                      value: 'startOnRight',
-                      checked: state.startOnRight,
-                      child: Text(tr('첫 장을 오른쪽에')),
+                      value: 'dualStepOne',
+                      checked: state.dualStepOne,
+                      child: Text(tr('한 장씩 밀어 넘기기')),
                     ),
+                    // 펼침면 맞추기는 두 장씩 넘길 때만 뜻이 있다.
+                    if (!state.dualStepOne)
+                      CheckedPopupMenuItem(
+                        value: 'startOnRight',
+                        checked: state.startOnRight,
+                        child: Text(tr('첫 장을 오른쪽에')),
+                      ),
+                  ],
                   if (state.isPaged) ...[
                     CheckedPopupMenuItem(
                       value: 'anim_slide',

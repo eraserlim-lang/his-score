@@ -363,7 +363,11 @@ class _InkLayerState extends State<InkLayer> {
                     tools: widget.tools,
                     crop: widget.crop,
                     size: size,
-                    editing: widget.editing && widget.tools.tool == InkTool.pen,
+                    // 펜 획은 PencilKit 이 들고 있어 지우개도 PencilKit 이 받아야 지워진다.
+                    // 도형처럼 Flutter 가 그린 획은 같은 손짓을 이 층이 함께 받아 지운다.
+                    editing: widget.editing &&
+                        (widget.tools.tool == InkTool.pen ||
+                            widget.tools.tool == InkTool.eraser),
                   )
                 : null;
 
@@ -380,7 +384,10 @@ class _InkLayerState extends State<InkLayer> {
               fit: StackFit.expand,
               children: [
                 ?pencil,
-                painter,
+                // 그림은 보여 주기만 한다. 입력은 바깥의 인식기가 받는다.
+                // 여기서 터치를 먹으면 아래 PencilKit 캔버스까지 닿지 않아
+                // iOS 에서 펜으로도 손가락으로도 써지지 않는다.
+                IgnorePointer(child: painter),
                 if (_selectedId != null && widget.tools.tool == InkTool.select)
                   Positioned(
                     right: 8,

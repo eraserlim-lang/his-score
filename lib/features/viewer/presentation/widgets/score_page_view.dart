@@ -35,6 +35,11 @@ class ScorePageView extends StatefulWidget {
 }
 
 class _ScorePageViewState extends State<ScorePageView> {
+  /// 캐시가 든 이미지의 복제 핸들.
+  ///
+  /// 캐시는 자리가 차거나 세션이 닫히면 제 이미지를 버린다. 그 이미지를 그대로
+  /// 빌려 쓰면 화면에 걸린 채로 죽어 검게 나온다. 크롭을 저장해 세션을 다시
+  /// 열 때가 그랬다. 복제 핸들은 이 위젯이 버릴 때까지 살아 있다.
   ui.Image? _image;
   PageRenderKey? _requested;
 
@@ -44,35 +49,57 @@ class _ScorePageViewState extends State<ScorePageView> {
     // 다른 페이지를 그리게 되면 이전 이미지를 잡고 있으면 안 된다.
     if (oldWidget.page.sourcePageNumber != widget.page.sourcePageNumber ||
         oldWidget.page.docIndex != widget.page.docIndex) {
-      _image = null;
+      _hold(null);
+      _requested = null;
+    } else if (!identical(oldWidget.session, widget.session)) {
+      // 같은 페이지지만 세션이 새로 열렸다. 새 캐시에서 다시 받는다.
+      // 그동안은 들고 있던 복제본을 그대로 보여 줘 깜빡이지 않게 한다.
       _requested = null;
     }
   }
 
   @override
   void dispose() {
-    // 이미지는 캐시가 소유하므로 여기서 dispose 하지 않는다.
-    _image = null;
+    _hold(null);
     super.dispose();
+  }
+
+  /// 캐시 이미지의 복제 핸들로 바꿔 든다. 들고 있던 것은 버린다.
+  void _hold(ui.Image? source) {
+    ui.Image? next;
+    try {
+      next = source?.clone();
+    } on Object {
+      // 받는 사이에 캐시가 이미 버렸다. 다음 build 에서 다시 요청한다.
+      next = null;
+      _requested = null;
+    }
+    _image?.dispose();
+    _image = next;
   }
 
   void _ensure(double targetWidth) {
     if (widget.page.isBlank) return;
     final key = PageRenderKey.forWidth(widget.page.sourcePageNumber, targetWidth);
-    if (key == _requested && _image != null) return;
+    if (key == _requested) return;
     _requested = key;
 
     final cache = widget.session.cacheFor(widget.page);
     final cached = cache.peek(key);
     if (cached != null) {
       // 같은 프레임 안에서 바로 그린다. setState 로 미루면 한 프레임 깜빡인다.
-      _image = cached;
+      _hold(cached);
       return;
     }
 
     cache.render(key).then((image) {
       if (!mounted || _requested != key) return;
-      setState(() => _image = image);
+      if (image == null) {
+        // 굽기에 실패했거나 세션이 닫혔다. 다음 build 에서 다시 요청하게 둔다.
+        _requested = null;
+        return;
+      }
+      setState(() => _hold(image));
     });
   }
 

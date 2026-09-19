@@ -151,13 +151,22 @@ class ScoreSession {
     final documents = <PdfDocument>[];
     final pages = <ViewPage>[];
 
-    for (final entry in entries) {
-      final document = await _openDocument(entry.score, paths);
-      final docIndex = documents.length;
-      scores.add(entry.score);
-      documents.add(document);
+    // 한 곡이 여러 구간으로 나뉘어 들어올 수 있다. 파일은 한 번만 연다.
+    final docOf = <String, int>{};
+    final pagesCache = <String, List<ScorePage>>{};
 
-      var scorePages = await pagesOf(entry.score.id);
+    for (final entry in entries) {
+      var docIndex = docOf[entry.score.id];
+      if (docIndex == null) {
+        docIndex = documents.length;
+        docOf[entry.score.id] = docIndex;
+        scores.add(entry.score);
+        documents.add(await _openDocument(entry.score, paths));
+      }
+      final document = documents[docIndex];
+
+      var scorePages =
+          pagesCache[entry.score.id] ??= await pagesOf(entry.score.id);
       final start = entry.item.startPage;
       final end = entry.item.endPage;
       if (start != null || end != null) {

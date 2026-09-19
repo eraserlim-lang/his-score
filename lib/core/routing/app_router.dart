@@ -18,6 +18,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/library',
+    // 다른 앱에서 "HIScore 로 열기" 하면 iOS 가 파일 URL 을 화면 경로처럼도
+    // 밀어 넣는다. 파일은 OpenInHandler 가 따로 받아 라이브러리에 넣으므로,
+    // 여기서는 길 없는 주소로 오류 화면에 갇히지 않게 라이브러리로 돌린다.
+    redirect: (context, state) {
+      final uri = state.uri;
+      if (uri.scheme == 'file' || uri.path.isEmpty || uri.path == '/') {
+        return '/library';
+      }
+      return null;
+    },
     routes: [
       ShellRoute(
         navigatorKey: _shellKey,

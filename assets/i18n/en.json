@@ -446,5 +446,15 @@
   "테마": "Theme",
   "밝게": "Light",
   "어둡게": "Dark",
-  "시스템 설정": "System setting"
+  "시스템 설정": "System setting",
+  "한 장씩 밀어 넘기기": "Slide one page at a time",
+  "탭 닫기": "Close tab",
+  "세트 페이지 순서": "Set page order",
+  "길게 눌러 끌면 곡을 넘나들며 순서가 바뀝니다. 빼기 아이콘으로 세트에서 빼고, + 로 복제합니다.": "Long-press and drag to move pages across songs. The remove icon takes a page out of the set, + duplicates it.",
+  "세트에서 빼기": "Remove from set",
+  "세트에 넣기": "Put back in set",
+  "세트에 남은 페이지가 없습니다": "No pages are left in the set",
+  "변과 모서리를 끌어 여백을 맞춥니다. 두 손가락을 벌려 확대합니다.": "Drag the edges and corners to set the margins. Pinch to zoom in.",
+  "변과 모서리를 끌어 여백을 맞춥니다. 두 손가락을 벌려 확대하고, 돌려서 기울기를 바로잡습니다.": "Drag the edges and corners to set the margins. Pinch to zoom in, and twist with two fingers to straighten the page.",
+  "기울기 0°로": "Reset tilt to 0°"
 }

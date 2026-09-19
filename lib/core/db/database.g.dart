@@ -156,6 +156,20 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, Score> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _dualStepOneMeta = const VerificationMeta(
+    'dualStepOne',
+  );
+  @override
+  late final GeneratedColumn<bool> dualStepOne = GeneratedColumn<bool>(
+    'dual_step_one',
+    aliasedName,
+    true,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dual_step_one" IN (0, 1))',
+    ),
+  );
   static const VerificationMeta _cropLeftMeta = const VerificationMeta(
     'cropLeft',
   );
@@ -278,6 +292,7 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, Score> {
     layout,
     turnAnimation,
     startOnRight,
+    dualStepOne,
     cropLeft,
     cropTop,
     cropRight,
@@ -378,6 +393,15 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, Score> {
         startOnRight.isAcceptableOrUnknown(
           data['start_on_right']!,
           _startOnRightMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dual_step_one')) {
+      context.handle(
+        _dualStepOneMeta,
+        dualStepOne.isAcceptableOrUnknown(
+          data['dual_step_one']!,
+          _dualStepOneMeta,
         ),
       );
     }
@@ -510,6 +534,10 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, Score> {
         DriftSqlType.bool,
         data['${effectivePrefix}start_on_right'],
       )!,
+      dualStepOne: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dual_step_one'],
+      ),
       cropLeft: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}crop_left'],
@@ -590,7 +618,13 @@ class Score extends DataClass implements Insertable<Score> {
   final TurnAnimation? turnAnimation;
 
   /// 2페이지 보기에서 1페이지를 오른쪽에 둘지 여부.
+  /// 두 장씩 넘기는 경우에만 뜻이 있다.
   final bool startOnRight;
+
+  /// 2페이지 보기에서 한 장씩 밀어 넘길지 여부.
+  /// 참이면 (1,2) (2,3) (3,4), 거짓이면 (1,2) (3,4) 로 넘어간다.
+  /// null 이면 기본값인 한 장씩을 따른다.
+  final bool? dualStepOne;
 
   /// 전체 페이지 공통 여백 크롭 비율 (0.0 ~ 0.45).
   final double cropLeft;
@@ -619,6 +653,7 @@ class Score extends DataClass implements Insertable<Score> {
     this.layout,
     this.turnAnimation,
     required this.startOnRight,
+    this.dualStepOne,
     required this.cropLeft,
     required this.cropTop,
     required this.cropRight,
@@ -666,6 +701,9 @@ class Score extends DataClass implements Insertable<Score> {
       );
     }
     map['start_on_right'] = Variable<bool>(startOnRight);
+    if (!nullToAbsent || dualStepOne != null) {
+      map['dual_step_one'] = Variable<bool>(dualStepOne);
+    }
     map['crop_left'] = Variable<double>(cropLeft);
     map['crop_top'] = Variable<double>(cropTop);
     map['crop_right'] = Variable<double>(cropRight);
@@ -714,6 +752,9 @@ class Score extends DataClass implements Insertable<Score> {
           ? const Value.absent()
           : Value(turnAnimation),
       startOnRight: Value(startOnRight),
+      dualStepOne: dualStepOne == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dualStepOne),
       cropLeft: Value(cropLeft),
       cropTop: Value(cropTop),
       cropRight: Value(cropRight),
@@ -754,6 +795,7 @@ class Score extends DataClass implements Insertable<Score> {
         serializer.fromJson<int?>(json['turnAnimation']),
       ),
       startOnRight: serializer.fromJson<bool>(json['startOnRight']),
+      dualStepOne: serializer.fromJson<bool?>(json['dualStepOne']),
       cropLeft: serializer.fromJson<double>(json['cropLeft']),
       cropTop: serializer.fromJson<double>(json['cropTop']),
       cropRight: serializer.fromJson<double>(json['cropRight']),
@@ -787,6 +829,7 @@ class Score extends DataClass implements Insertable<Score> {
         $ScoresTable.$converterturnAnimationn.toJson(turnAnimation),
       ),
       'startOnRight': serializer.toJson<bool>(startOnRight),
+      'dualStepOne': serializer.toJson<bool?>(dualStepOne),
       'cropLeft': serializer.toJson<double>(cropLeft),
       'cropTop': serializer.toJson<double>(cropTop),
       'cropRight': serializer.toJson<double>(cropRight),
@@ -814,6 +857,7 @@ class Score extends DataClass implements Insertable<Score> {
     Value<PageLayout?> layout = const Value.absent(),
     Value<TurnAnimation?> turnAnimation = const Value.absent(),
     bool? startOnRight,
+    Value<bool?> dualStepOne = const Value.absent(),
     double? cropLeft,
     double? cropTop,
     double? cropRight,
@@ -840,6 +884,7 @@ class Score extends DataClass implements Insertable<Score> {
         ? turnAnimation.value
         : this.turnAnimation,
     startOnRight: startOnRight ?? this.startOnRight,
+    dualStepOne: dualStepOne.present ? dualStepOne.value : this.dualStepOne,
     cropLeft: cropLeft ?? this.cropLeft,
     cropTop: cropTop ?? this.cropTop,
     cropRight: cropRight ?? this.cropRight,
@@ -874,6 +919,9 @@ class Score extends DataClass implements Insertable<Score> {
       startOnRight: data.startOnRight.present
           ? data.startOnRight.value
           : this.startOnRight,
+      dualStepOne: data.dualStepOne.present
+          ? data.dualStepOne.value
+          : this.dualStepOne,
       cropLeft: data.cropLeft.present ? data.cropLeft.value : this.cropLeft,
       cropTop: data.cropTop.present ? data.cropTop.value : this.cropTop,
       cropRight: data.cropRight.present ? data.cropRight.value : this.cropRight,
@@ -909,6 +957,7 @@ class Score extends DataClass implements Insertable<Score> {
           ..write('layout: $layout, ')
           ..write('turnAnimation: $turnAnimation, ')
           ..write('startOnRight: $startOnRight, ')
+          ..write('dualStepOne: $dualStepOne, ')
           ..write('cropLeft: $cropLeft, ')
           ..write('cropTop: $cropTop, ')
           ..write('cropRight: $cropRight, ')
@@ -938,6 +987,7 @@ class Score extends DataClass implements Insertable<Score> {
     layout,
     turnAnimation,
     startOnRight,
+    dualStepOne,
     cropLeft,
     cropTop,
     cropRight,
@@ -966,6 +1016,7 @@ class Score extends DataClass implements Insertable<Score> {
           other.layout == this.layout &&
           other.turnAnimation == this.turnAnimation &&
           other.startOnRight == this.startOnRight &&
+          other.dualStepOne == this.dualStepOne &&
           other.cropLeft == this.cropLeft &&
           other.cropTop == this.cropTop &&
           other.cropRight == this.cropRight &&
@@ -992,6 +1043,7 @@ class ScoresCompanion extends UpdateCompanion<Score> {
   final Value<PageLayout?> layout;
   final Value<TurnAnimation?> turnAnimation;
   final Value<bool> startOnRight;
+  final Value<bool?> dualStepOne;
   final Value<double> cropLeft;
   final Value<double> cropTop;
   final Value<double> cropRight;
@@ -1017,6 +1069,7 @@ class ScoresCompanion extends UpdateCompanion<Score> {
     this.layout = const Value.absent(),
     this.turnAnimation = const Value.absent(),
     this.startOnRight = const Value.absent(),
+    this.dualStepOne = const Value.absent(),
     this.cropLeft = const Value.absent(),
     this.cropTop = const Value.absent(),
     this.cropRight = const Value.absent(),
@@ -1043,6 +1096,7 @@ class ScoresCompanion extends UpdateCompanion<Score> {
     this.layout = const Value.absent(),
     this.turnAnimation = const Value.absent(),
     this.startOnRight = const Value.absent(),
+    this.dualStepOne = const Value.absent(),
     this.cropLeft = const Value.absent(),
     this.cropTop = const Value.absent(),
     this.cropRight = const Value.absent(),
@@ -1071,6 +1125,7 @@ class ScoresCompanion extends UpdateCompanion<Score> {
     Expression<int>? layout,
     Expression<int>? turnAnimation,
     Expression<bool>? startOnRight,
+    Expression<bool>? dualStepOne,
     Expression<double>? cropLeft,
     Expression<double>? cropTop,
     Expression<double>? cropRight,
@@ -1097,6 +1152,7 @@ class ScoresCompanion extends UpdateCompanion<Score> {
       if (layout != null) 'layout': layout,
       if (turnAnimation != null) 'turn_animation': turnAnimation,
       if (startOnRight != null) 'start_on_right': startOnRight,
+      if (dualStepOne != null) 'dual_step_one': dualStepOne,
       if (cropLeft != null) 'crop_left': cropLeft,
       if (cropTop != null) 'crop_top': cropTop,
       if (cropRight != null) 'crop_right': cropRight,
@@ -1125,6 +1181,7 @@ class ScoresCompanion extends UpdateCompanion<Score> {
     Value<PageLayout?>? layout,
     Value<TurnAnimation?>? turnAnimation,
     Value<bool>? startOnRight,
+    Value<bool?>? dualStepOne,
     Value<double>? cropLeft,
     Value<double>? cropTop,
     Value<double>? cropRight,
@@ -1151,6 +1208,7 @@ class ScoresCompanion extends UpdateCompanion<Score> {
       layout: layout ?? this.layout,
       turnAnimation: turnAnimation ?? this.turnAnimation,
       startOnRight: startOnRight ?? this.startOnRight,
+      dualStepOne: dualStepOne ?? this.dualStepOne,
       cropLeft: cropLeft ?? this.cropLeft,
       cropTop: cropTop ?? this.cropTop,
       cropRight: cropRight ?? this.cropRight,
@@ -1213,6 +1271,9 @@ class ScoresCompanion extends UpdateCompanion<Score> {
     if (startOnRight.present) {
       map['start_on_right'] = Variable<bool>(startOnRight.value);
     }
+    if (dualStepOne.present) {
+      map['dual_step_one'] = Variable<bool>(dualStepOne.value);
+    }
     if (cropLeft.present) {
       map['crop_left'] = Variable<double>(cropLeft.value);
     }
@@ -1263,6 +1324,7 @@ class ScoresCompanion extends UpdateCompanion<Score> {
           ..write('layout: $layout, ')
           ..write('turnAnimation: $turnAnimation, ')
           ..write('startOnRight: $startOnRight, ')
+          ..write('dualStepOne: $dualStepOne, ')
           ..write('cropLeft: $cropLeft, ')
           ..write('cropTop: $cropTop, ')
           ..write('cropRight: $cropRight, ')
@@ -6233,6 +6295,7 @@ typedef $$ScoresTableCreateCompanionBuilder =
       Value<PageLayout?> layout,
       Value<TurnAnimation?> turnAnimation,
       Value<bool> startOnRight,
+      Value<bool?> dualStepOne,
       Value<double> cropLeft,
       Value<double> cropTop,
       Value<double> cropRight,
@@ -6260,6 +6323,7 @@ typedef $$ScoresTableUpdateCompanionBuilder =
       Value<PageLayout?> layout,
       Value<TurnAnimation?> turnAnimation,
       Value<bool> startOnRight,
+      Value<bool?> dualStepOne,
       Value<double> cropLeft,
       Value<double> cropTop,
       Value<double> cropRight,
@@ -6481,6 +6545,11 @@ class $$ScoresTableFilterComposer
 
   ColumnFilters<bool> get startOnRight => $composableBuilder(
     column: $table.startOnRight,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get dualStepOne => $composableBuilder(
+    column: $table.dualStepOne,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6784,6 +6853,11 @@ class $$ScoresTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get dualStepOne => $composableBuilder(
+    column: $table.dualStepOne,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get cropLeft => $composableBuilder(
     column: $table.cropLeft,
     builder: (column) => ColumnOrderings(column),
@@ -6885,6 +6959,11 @@ class $$ScoresTableAnnotationComposer
 
   GeneratedColumn<bool> get startOnRight => $composableBuilder(
     column: $table.startOnRight,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get dualStepOne => $composableBuilder(
+    column: $table.dualStepOne,
     builder: (column) => column,
   );
 
@@ -7147,6 +7226,7 @@ class $$ScoresTableTableManager
                 Value<PageLayout?> layout = const Value.absent(),
                 Value<TurnAnimation?> turnAnimation = const Value.absent(),
                 Value<bool> startOnRight = const Value.absent(),
+                Value<bool?> dualStepOne = const Value.absent(),
                 Value<double> cropLeft = const Value.absent(),
                 Value<double> cropTop = const Value.absent(),
                 Value<double> cropRight = const Value.absent(),
@@ -7172,6 +7252,7 @@ class $$ScoresTableTableManager
                 layout: layout,
                 turnAnimation: turnAnimation,
                 startOnRight: startOnRight,
+                dualStepOne: dualStepOne,
                 cropLeft: cropLeft,
                 cropTop: cropTop,
                 cropRight: cropRight,
@@ -7199,6 +7280,7 @@ class $$ScoresTableTableManager
                 Value<PageLayout?> layout = const Value.absent(),
                 Value<TurnAnimation?> turnAnimation = const Value.absent(),
                 Value<bool> startOnRight = const Value.absent(),
+                Value<bool?> dualStepOne = const Value.absent(),
                 Value<double> cropLeft = const Value.absent(),
                 Value<double> cropTop = const Value.absent(),
                 Value<double> cropRight = const Value.absent(),
@@ -7224,6 +7306,7 @@ class $$ScoresTableTableManager
                 layout: layout,
                 turnAnimation: turnAnimation,
                 startOnRight: startOnRight,
+                dualStepOne: dualStepOne,
                 cropLeft: cropLeft,
                 cropTop: cropTop,
                 cropRight: cropRight,

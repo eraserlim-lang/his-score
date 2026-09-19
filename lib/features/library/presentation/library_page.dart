@@ -10,6 +10,7 @@ import '../../../core/layout/breakpoints.dart';
 import '../../importer/data/score_importer.dart';
 import '../../importer/presentation/import_actions.dart';
 import '../../setlist/presentation/setlist_picker.dart';
+import '../../viewer/domain/open_tabs.dart';
 import 'cover_image.dart';
 import 'score_info_sheet.dart';
 import 'tag_manager_sheet.dart';
@@ -98,6 +99,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
     final importer = await ref.read(scoreImporterProvider.future);
     await importer.deleteScores(targets);
+    // 지운 곡이 상단 탭에 남아 있으면 치운다.
+    ref.read(openTabsProvider.notifier).closeIds([for (final s in targets) s.id]);
     _clearSelection();
   }
 

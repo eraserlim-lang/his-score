@@ -215,7 +215,7 @@ final class PencilKitPlatformView: NSObject, FlutterPlatformView, PKCanvasViewDe
     channel.invokeMethod("drawingChanged", arguments: FlutterStandardTypedData(bytes: data))
   }
 
-  func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
-    channel.invokeMethod("stylusSeen", arguments: nil)
-  }
+  // 펜을 봤다는 사실은 여기서 알리지 않는다. 이 콜백은 손가락으로 그려도 불려서,
+  // 손가락 첫 획에 "펜 있음" 으로 바뀌어 다음 획부터 손가락 그리기가 꺼졌다.
+  // 펜 입력은 Flutter 쪽 포인터 이벤트(stylus)로도 들어오므로 거기서 판별한다.
 }

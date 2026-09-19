@@ -7,7 +7,11 @@ import 'score_page_view.dart';
 
 /// 1페이지 / 2페이지 보기. 한 묶음씩 넘긴다.
 ///
-/// 확대는 묶음 단위로 건다. 넘기면 확대가 풀리는 편이 연주 중에 안전하다.
+/// 2페이지 보기에서 한 장씩 넘길 때는 묶음을 통째로 갈아 끼우지 않는다.
+/// 페이지를 한 줄로 이어 붙인 띠를 반 화면씩 밀어, 이어진 카드를 옆으로
+/// 넘기듯 오른쪽 장이 왼쪽 자리로 미끄러져 들어오게 한다.
+///
+/// 확대는 화면 전체에 건다. 넘기면 확대가 풀리는 편이 연주 중에 안전하다.
 class PagedScoreView extends StatefulWidget {
   const PagedScoreView({
     super.key,
@@ -17,6 +21,7 @@ class PagedScoreView extends StatefulWidget {
     required this.pageIndex,
     required this.onPageChanged,
     this.overlayBuilder,
+    this.panEnabled = true,
   });
 
   final ScoreSession session;
@@ -26,6 +31,10 @@ class PagedScoreView extends StatefulWidget {
   final ValueChanged<int> onPageChanged;
   final PageOverlayBuilder? overlayBuilder;
 
+  /// 확대한 화면을 한 손가락으로 끌어 옮길 수 있는지.
+  /// 필기 중에는 한 손가락이 펜이므로 꺼 둔다.
+  final bool panEnabled;
+
   @override
   State<PagedScoreView> createState() => PagedScoreViewState();
 }
@@ -33,15 +42,25 @@ class PagedScoreView extends StatefulWidget {
 class PagedScoreViewState extends State<PagedScoreView> {
   late PageController _controller;
   late int _spread;
+  late bool _sliding;
 
-  /// 확대 상태를 묶음마다 새로 만든다.
-  final _zoomKey = GlobalKey();
+  final _zoomKey = GlobalKey<_ZoomableState>();
+  bool _zoomed = false;
+
+  /// 한 장뿐이면 밀 것이 없다. 가운데에 세우는 보통 방식으로 그린다.
+  bool _slidingFor(SpreadMap map) => map.isSliding && map.pageCount > 1;
+
+  PageController _controllerFor(int spread) => PageController(
+        initialPage: spread,
+        viewportFraction: _sliding ? 0.5 : 1,
+      );
 
   @override
   void initState() {
     super.initState();
     _spread = widget.map.spreadOf(widget.pageIndex);
-    _controller = PageController(initialPage: _spread);
+    _sliding = _slidingFor(widget.map);
+    _controller = _controllerFor(_spread);
   }
 
   @override
@@ -49,16 +68,29 @@ class PagedScoreViewState extends State<PagedScoreView> {
     super.didUpdateWidget(oldWidget);
 
     final target = widget.map.spreadOf(widget.pageIndex);
+    final sliding = _slidingFor(widget.map);
+
+    if (sliding != _sliding) {
+      // 띠와 묶음은 화면 폭을 나누는 방식이 달라 컨트롤러를 새로 만든다.
+      final old = _controller;
+      _sliding = sliding;
+      _spread = target;
+      _controller = _controllerFor(target);
+      WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+      _resetZoom();
+      return;
+    }
+
     if (target != _spread && _controller.hasClients) {
       _spread = target;
+      _resetZoom();
       // 멀리 건너뛸 때 중간 페이지를 전부 스쳐 지나가면 느리다.
-      if ((_controller.page ?? 0).round() - target != 0 &&
-          ((_controller.page ?? 0).round() - target).abs() > 1) {
+      if (((_controller.page ?? 0).round() - target).abs() > 1) {
         _controller.jumpToPage(target);
       } else {
         _controller.animateToPage(
           target,
-          duration: const Duration(milliseconds: 220),
+          duration: Duration(milliseconds: _sliding ? 280 : 220),
           curve: Curves.easeOutCubic,
         );
       }
@@ -76,14 +108,46 @@ class PagedScoreViewState extends State<PagedScoreView> {
     widget.onPageChanged(widget.map.firstPageOf(spread));
   }
 
+  void _resetZoom() {
+    if (!_zoomed) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _zoomKey.currentState?.reset();
+    });
+  }
+
+  void _handleZoomChanged(bool zoomed) {
+    if (zoomed == _zoomed || !mounted) return;
+    setState(() => _zoomed = zoomed);
+  }
+
+  /// 지금 스크롤 위치(묶음 단위). 아직 배치 전이면 목표 묶음을 돌려준다.
+  double get _position =>
+      _controller.hasClients && _controller.position.hasContentDimensions
+          ? (_controller.page ?? _spread.toDouble())
+          : _spread.toDouble();
+
   @override
   Widget build(BuildContext context) {
-    return PageView.builder(
+    // 확대한 동안에는 한 손가락 끌기가 화면 이동이다. 넘김은 탭과 페달로 한다.
+    final physics = _zoomed
+        ? const NeverScrollableScrollPhysics()
+        : const PageScrollPhysics(parent: ClampingScrollPhysics());
+
+    return _Zoomable(
       key: _zoomKey,
+      panEnabled: widget.panEnabled,
+      onZoomChanged: _handleZoomChanged,
+      child: _sliding ? _buildStrip(physics) : _buildSpreads(physics),
+    );
+  }
+
+  Widget _buildSpreads(ScrollPhysics physics) {
+    return PageView.builder(
+      key: const ValueKey('spreads'),
       controller: _controller,
       itemCount: widget.map.spreadCount,
       onPageChanged: _handlePageChanged,
-      physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
+      physics: physics,
       itemBuilder: (context, spread) {
         final content = _Spread(
           session: widget.session,
@@ -91,20 +155,48 @@ class PagedScoreViewState extends State<PagedScoreView> {
           overlayBuilder: widget.overlayBuilder,
         );
 
-        if (widget.animation == TurnAnimation.slide) {
-          return _Zoomable(child: content);
-        }
+        if (widget.animation == TurnAnimation.slide) return content;
+
+        return AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) =>
+              _applyAnimation(widget.animation, _position - spread, child!),
+          child: content,
+        );
+      },
+    );
+  }
+
+  /// 한 장씩 넘기는 2페이지 보기. 칸 하나가 페이지 한 장이고 반 화면씩 민다.
+  ///
+  /// 넘김 효과는 밀기 하나만 쓴다. 쌓기와 말기는 묶음 전체가 갈리는 것을
+  /// 전제로 만든 것이라 이어진 띠와 맞지 않는다.
+  Widget _buildStrip(ScrollPhysics physics) {
+    final pageCount = widget.map.pageCount;
+    return PageView.builder(
+      key: const ValueKey('strip'),
+      controller: _controller,
+      padEnds: false,
+      // 마지막 장이 왼쪽 자리까지 올 수 있게 빈 칸을 하나 덧붙인다.
+      itemCount: pageCount + 1,
+      onPageChanged: _handlePageChanged,
+      physics: physics,
+      itemBuilder: (context, index) {
+        if (index >= pageCount) return const SizedBox.shrink();
 
         return AnimatedBuilder(
           animation: _controller,
           builder: (context, child) {
-            final offset = _controller.hasClients &&
-                    _controller.position.hasContentDimensions
-                ? (_controller.page ?? _spread.toDouble()) - spread
-                : 0.0;
-            return _applyAnimation(widget.animation, offset, child!);
+            // 왼쪽 자리(0)에서는 오른쪽으로, 오른쪽 자리(1)에서는 왼쪽으로 붙여
+            // 두 장이 가운데에서 맞닿게 한다. 넘기는 동안에는 그 사이를 잇는다.
+            final slot = (index - _position).clamp(0.0, 1.0);
+            return Align(alignment: Alignment(1 - 2 * slot, 0), child: child);
           },
-          child: _Zoomable(child: content),
+          child: ScorePageView(
+            session: widget.session,
+            page: widget.session.pages[index],
+            overlayBuilder: widget.overlayBuilder,
+          ),
         );
       },
     );
@@ -183,11 +275,21 @@ class _Spread extends StatelessWidget {
   }
 }
 
-/// 핀치 확대. 두 손가락일 때만 반응해 한 손가락 스와이프 넘김과 겹치지 않는다.
+/// 핀치로 확대하고 축소한다.
+///
+/// 확대하지 않았을 때는 두 손가락에만 반응해 한 손가락 스와이프 넘김과
+/// 겹치지 않는다. 확대한 뒤에는 한 손가락으로 끌어 화면을 옮긴다.
 class _Zoomable extends StatefulWidget {
-  const _Zoomable({required this.child});
+  const _Zoomable({
+    super.key,
+    required this.child,
+    required this.panEnabled,
+    required this.onZoomChanged,
+  });
 
   final Widget child;
+  final bool panEnabled;
+  final ValueChanged<bool> onZoomChanged;
 
   @override
   State<_Zoomable> createState() => _ZoomableState();
@@ -195,11 +297,27 @@ class _Zoomable extends StatefulWidget {
 
 class _ZoomableState extends State<_Zoomable> {
   final _controller = TransformationController();
+  bool _zoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_handleTransform);
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void reset() => _controller.value = Matrix4.identity();
+
+  void _handleTransform() {
+    final zoomed = _controller.value.getMaxScaleOnAxis() > 1.02;
+    if (zoomed == _zoomed) return;
+    setState(() => _zoomed = zoomed);
+    widget.onZoomChanged(zoomed);
   }
 
   @override
@@ -209,11 +327,10 @@ class _ZoomableState extends State<_Zoomable> {
       minScale: 1,
       maxScale: 6,
       // 확대하지 않았을 때는 드래그를 PageView 가 가져가야 넘김이 된다.
-      panEnabled: false,
+      panEnabled: _zoomed && widget.panEnabled,
       scaleEnabled: true,
       onInteractionEnd: (_) {
-        final scale = _controller.value.getMaxScaleOnAxis();
-        if (scale <= 1.02) _controller.value = Matrix4.identity();
+        if (!_zoomed) reset();
       },
       child: widget.child,
     );

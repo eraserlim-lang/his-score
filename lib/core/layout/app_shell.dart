@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/viewer/domain/open_tabs.dart';
+import '../../features/viewer/presentation/widgets/score_tab_bar.dart';
 import '../i18n/tr.dart';
 import 'breakpoints.dart';
 
@@ -66,7 +69,7 @@ class AppShell extends StatelessWidget {
 
     if (formFactor.isCompact) {
       return Scaffold(
-        body: child,
+        body: _WithTabs(child: child),
         bottomNavigationBar: NavigationBar(
           selectedIndex: currentIndex,
           onDestinationSelected: onDestinationSelected,
@@ -100,9 +103,37 @@ class AppShell extends StatelessWidget {
             ],
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: child),
+          Expanded(child: _WithTabs(child: child)),
         ],
       ),
+    );
+  }
+}
+
+/// 열어 둔 악보 탭을 목록 화면 위에도 걸어 둔다.
+/// 보기 화면을 닫아도 탭은 남아 있어 곧장 되돌아갈 수 있다.
+class _WithTabs extends ConsumerWidget {
+  const _WithTabs({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasTabs = ref.watch(openTabsProvider).isNotEmpty;
+    if (!hasTabs) return child;
+
+    return Column(
+      children: [
+        const SafeArea(bottom: false, child: ScoreTabBar()),
+        // 상단 여백은 탭 줄이 이미 먹었다. 아래 화면의 앱바가 또 밀지 않게 한다.
+        Expanded(
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            child: child,
+          ),
+        ),
+      ],
     );
   }
 }

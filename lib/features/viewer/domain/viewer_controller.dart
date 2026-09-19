@@ -16,6 +16,7 @@ class ViewerState {
     this.animation = TurnAnimation.slide,
     this.pageIndex = 0,
     this.startOnRight = false,
+    this.dualStepOne = true,
     this.performanceMode = false,
     this.autoScrolling = false,
     this.autoScrollSeconds = 180,
@@ -31,7 +32,12 @@ class ViewerState {
   final int pageIndex;
 
   /// 2페이지 보기에서 첫 페이지를 오른쪽에 두는지. 펼침면을 맞출 때 쓴다.
+  /// 두 장씩 넘길 때만 뜻이 있다.
   final bool startOnRight;
+
+  /// 2페이지 보기에서 한 장씩 밀어 넘기는지.
+  /// 참이면 (1,2) (2,3) (3,4), 거짓이면 (1,2) (3,4) 로 넘어간다.
+  final bool dualStepOne;
 
   /// 연주 중 오조작을 막는 모드. 화면을 눌러도 메뉴가 뜨지 않는다.
   final bool performanceMode;
@@ -53,7 +59,7 @@ class ViewerState {
   bool get isStrip => layout == PageLayout.scroll || layout == PageLayout.half;
   bool get isPaged => !isStrip;
 
-  int get spreadStep => layout == PageLayout.dual ? 2 : 1;
+  int get spreadStep => layout == PageLayout.dual && !dualStepOne ? 2 : 1;
 
   bool get canGoNext => pageIndex + spreadStep < pageCount;
   bool get canGoPrevious => pageIndex > 0;
@@ -64,6 +70,7 @@ class ViewerState {
     TurnAnimation? animation,
     int? pageIndex,
     bool? startOnRight,
+    bool? dualStepOne,
     bool? performanceMode,
     bool? autoScrolling,
     double? autoScrollSeconds,
@@ -76,6 +83,7 @@ class ViewerState {
       animation: animation ?? this.animation,
       pageIndex: pageIndex ?? this.pageIndex,
       startOnRight: startOnRight ?? this.startOnRight,
+      dualStepOne: dualStepOne ?? this.dualStepOne,
       performanceMode: performanceMode ?? this.performanceMode,
       autoScrolling: autoScrolling ?? this.autoScrolling,
       autoScrollSeconds: autoScrollSeconds ?? this.autoScrollSeconds,
@@ -135,6 +143,17 @@ class ViewerController extends ChangeNotifier {
     _set(_state.copyWith(pageIndex: clamped));
   }
 
+  /// 세션을 다시 열어 페이지 수가 달라졌을 때 맞춰 준다.
+  ///
+  /// 화면을 그리는 도중에 불릴 수 있어 [onPageChanged] 는 부르지 않는다.
+  /// 미리 굽기와 자리 기록은 화면 쪽이 프레임이 끝난 뒤에 따로 한다.
+  void resize(int pageCount, int pageIndex) {
+    final clamped = pageIndex.clamp(0, (pageCount - 1).clamp(0, 1 << 30));
+    if (pageCount == _state.pageCount && clamped == _state.pageIndex) return;
+    _state = _state.copyWith(pageCount: pageCount, pageIndex: clamped);
+    notifyListeners();
+  }
+
   void setLayout(PageLayout layout) {
     if (layout == _state.layout) return;
     // 스크롤 계열에서 벗어나면 자동 스크롤은 의미가 없다.
@@ -163,6 +182,9 @@ class ViewerController extends ChangeNotifier {
 
   void setStartOnRight(bool value) =>
       _set(_state.copyWith(startOnRight: value));
+
+  void setDualStepOne(bool value) =>
+      _set(_state.copyWith(dualStepOne: value));
 
   void setPerformanceMode(bool value) =>
       _set(_state.copyWith(performanceMode: value));

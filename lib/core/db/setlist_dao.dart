@@ -22,6 +22,21 @@ class SetlistEntry {
   }
 }
 
+/// 새로 써 넣을 세트리스트 항목 하나. 페이지 순서를 고친 결과를 받는다.
+class SetlistItemDraft {
+  const SetlistItemDraft({
+    required this.scoreId,
+    this.startPage,
+    this.endPage,
+  });
+
+  final String scoreId;
+
+  /// 곡의 보이는 페이지 목록 안에서의 구간. null 이면 곡 전체다.
+  final int? startPage;
+  final int? endPage;
+}
+
 class SetlistWithCount {
   const SetlistWithCount({required this.setlist, required this.itemCount});
 
@@ -155,6 +170,33 @@ class SetlistDao extends DatabaseAccessor<AppDatabase> with _$SetlistDaoMixin {
               ..where((t) => t.id.equals(itemIdsInOrder[i])))
             .write(SetlistItemsCompanion(sortOrder: Value(i)));
       }
+      await _touch(setlistId);
+    });
+  }
+
+  /// 항목 목록을 통째로 갈아 끼운다.
+  ///
+  /// 세트 전체의 페이지 순서를 고치면 한 곡이 여러 구간으로 쪼개지거나
+  /// 순서가 뒤바뀔 수 있어, 항목을 다시 만드는 편이 깔끔하다.
+  Future<void> replaceItems(String setlistId, List<SetlistItemDraft> items) {
+    return transaction(() async {
+      await (delete(setlistItems)..where((t) => t.setlistId.equals(setlistId)))
+          .go();
+      await batch((b) {
+        for (var i = 0; i < items.length; i++) {
+          b.insert(
+            setlistItems,
+            SetlistItemsCompanion.insert(
+              id: _uuid.v4(),
+              setlistId: setlistId,
+              scoreId: items[i].scoreId,
+              sortOrder: i,
+              startPage: Value(items[i].startPage),
+              endPage: Value(items[i].endPage),
+            ),
+          );
+        }
+      });
       await _touch(setlistId);
     });
   }

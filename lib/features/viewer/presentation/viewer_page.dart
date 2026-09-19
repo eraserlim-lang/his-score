@@ -23,6 +23,7 @@ import '../domain/turn_input.dart';
 import '../../../core/db/database.dart';
 import '../data/page_tools_dao.dart';
 import '../data/score_session.dart';
+import '../domain/open_tabs.dart';
 import '../domain/spreads.dart';
 import '../domain/viewer_controller.dart';
 import 'pages/page_order_page.dart';
@@ -30,20 +31,29 @@ import 'sheets/bookmarks_sheet.dart';
 import 'sheets/crop_sheet.dart';
 import 'widgets/jump_layer.dart';
 import 'widgets/paged_score_view.dart';
+import 'widgets/score_tab_bar.dart';
 import 'widgets/strip_score_view.dart';
 import 'widgets/viewer_toolbar.dart';
 import '../../../core/i18n/tr.dart';
 
 /// 악보 보기 화면.
-class ViewerPage extends ConsumerWidget {
+class ViewerPage extends ConsumerStatefulWidget {
   const ViewerPage({super.key, required this.sessionKey, this.initialPage});
 
   final SessionKey sessionKey;
   final int? initialPage;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(scoreSessionProvider(sessionKey));
+  ConsumerState<ViewerPage> createState() => _ViewerPageState();
+}
+
+class _ViewerPageState extends ConsumerState<ViewerPage> {
+  /// 크롭이나 페이지 순서를 고친 뒤 세션을 다시 열 때 돌아갈 자리.
+  int? _restorePage;
+
+  @override
+  Widget build(BuildContext context) {
+    final session = ref.watch(scoreSessionProvider(widget.sessionKey));
 
     return Scaffold(
       backgroundColor: ViewerColors.canvas,
@@ -53,8 +63,12 @@ class ViewerPage extends ConsumerWidget {
         data: (session) => _ViewerBody(
           session: session,
           // 세트리스트는 항상 처음부터 시작한다. 공연 흐름과 맞다.
-          initialPage: initialPage ??
+          // 탭으로 열어 둔 문서는 떠날 때 보던 자리로 돌아간다.
+          initialPage: _restorePage ??
+              widget.initialPage ??
+              ref.read(openTabsProvider.notifier).pageOf(widget.sessionKey) ??
               (session.key.isSetlist ? 0 : session.primaryScore.lastPage),
+          onReopen: (page) => setState(() => _restorePage = page),
         ),
       ),
     );
@@ -62,10 +76,17 @@ class ViewerPage extends ConsumerWidget {
 }
 
 class _ViewerBody extends ConsumerStatefulWidget {
-  const _ViewerBody({required this.session, required this.initialPage});
+  const _ViewerBody({
+    required this.session,
+    required this.initialPage,
+    required this.onReopen,
+  });
 
   final ScoreSession session;
   final int initialPage;
+
+  /// 세션을 다시 열어 달라고 부모에게 알린다. 돌아갈 페이지를 함께 준다.
+  final ValueChanged<int> onReopen;
 
   @override
   ConsumerState<_ViewerBody> createState() => _ViewerBodyState();
@@ -98,6 +119,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
         animation: score.turnAnimation ?? TurnAnimation.slide,
         pageIndex: widget.initialPage.clamp(0, (pageCount - 1).clamp(0, 1 << 30)),
         startOnRight: score.startOnRight,
+        dualStepOne: score.dualStepOne ?? true,
         autoScrollSeconds: (score.autoScrollSeconds ?? 180).toDouble(),
       ),
     )
@@ -115,7 +137,25 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
       if (mounted) _pedals = PedalMapping.decode(raw);
     });
 
-    // 첫 화면에 보일 페이지 주변을 미리 굽는다.
+    // 첫 화면에 보일 페이지 주변을 미리 굽고, 상단 탭에 이 문서를 올린다.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(openTabsProvider.notifier).open(
+            widget.session.key,
+            widget.session.title,
+            page: _controller.state.pageIndex,
+          );
+      _handlePageChanged(_controller.state.pageIndex);
+    });
+  }
+
+  @override
+  void didUpdateWidget(_ViewerBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.session, widget.session)) return;
+    // 페이지 순서나 크롭을 고쳐 세션을 다시 열었다. 페이지 수를 맞추고
+    // 보던 자리로 돌아간다. 페달과 필기는 그대로 살려 둔다.
+    _controller.resize(widget.session.pageCount, widget.initialPage);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _handlePageChanged(_controller.state.pageIndex);
     });
@@ -171,6 +211,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
         last.layout == s.layout &&
         last.animation == s.animation &&
         last.startOnRight == s.startOnRight &&
+        last.dualStepOne == s.dualStepOne &&
         last.autoScrollSeconds == s.autoScrollSeconds) {
       return;
     }
@@ -181,6 +222,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
             layout: Value(s.layout),
             turnAnimation: Value(s.animation),
             startOnRight: Value(s.startOnRight),
+            dualStepOne: Value(s.dualStepOne),
             autoScrollSeconds: Value(s.autoScrollSeconds.round()),
           ),
         );
@@ -233,8 +275,29 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   /// 크롭이나 순서를 바꾼 뒤 세션을 다시 연다. 보던 페이지는 유지한다.
   void _reloadSession() {
     final page = _controller.state.pageIndex;
-    ref.read(scoreDaoProvider).markOpened(widget.session.primaryScore.id, page);
+    if (!widget.session.key.isSetlist) {
+      ref.read(scoreDaoProvider).markOpened(widget.session.primaryScore.id, page);
+    }
+    widget.onReopen(page);
     ref.invalidate(scoreSessionProvider(widget.session.key));
+  }
+
+  /// 다른 탭으로 옮겨 간다. 보기 화면은 한 장만 쌓아 둔다.
+  void _selectTab(OpenTab tab) =>
+      context.pushReplacement('${tab.location}?page=${tab.page}');
+
+  /// 탭을 닫는다. 보고 있던 탭이면 옆 탭으로 옮기고, 마지막이면 화면을 나간다.
+  void _closeTab(OpenTab tab) {
+    final tabs = ref.read(openTabsProvider.notifier);
+    final isCurrent = tab.key == widget.session.key;
+    final neighbour = isCurrent ? tabs.neighbourOf(tab.key) : null;
+    tabs.close(tab.key);
+    if (!isCurrent) return;
+    if (neighbour != null) {
+      _selectTab(neighbour);
+    } else {
+      Navigator.of(context).maybePop();
+    }
   }
 
   ViewPage get _currentPage => widget.session.pages[_controller.state.pageIndex];
@@ -261,7 +324,8 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
           MaterialPageRoute(
             builder: (_) => PageOrderPage(
               session: widget.session,
-              scoreId: _currentPage.scoreId,
+              // 세트리스트는 세트에 든 모든 곡의 페이지를 한 줄로 놓고 고친다.
+              scoreId: widget.session.key.isSetlist ? null : _currentPage.scoreId,
             ),
           ),
         );
@@ -278,6 +342,8 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
         );
       case 'startOnRight':
         _controller.setStartOnRight(!state.startOnRight);
+      case 'dualStepOne':
+        _controller.setDualStepOne(!state.dualStepOne);
       case 'anim_slide':
         _controller.setAnimation(TurnAnimation.slide);
       case 'anim_stack':
@@ -340,6 +406,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
 
   void _handlePageChanged(int pageIndex) {
     if (pageIndex < 0 || pageIndex >= widget.session.pageCount) return;
+
+    // 탭으로 돌아왔을 때 이 자리에서 다시 시작한다.
+    ref.read(openTabsProvider.notifier).updatePage(widget.session.key, pageIndex);
 
     final page = widget.session.pages[pageIndex];
     _hub.reportPosition(
@@ -470,6 +539,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                       child: _TopBar(
                         title: _titleFor(state),
                         state: state,
+                        sessionKey: widget.session.key,
+                        onSelectTab: _selectTab,
+                        onCloseTab: _closeTab,
                       ),
                     ),
                     Positioned(
@@ -559,11 +631,14 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
         pageCount: state.pageCount,
         layout: state.layout,
         startOnRight: state.startOnRight,
+        stepOne: state.dualStepOne,
       ),
       animation: state.animation,
       pageIndex: state.pageIndex,
       onPageChanged: _controller.reportPageChanged,
       overlayBuilder: _inkOverlay,
+      // 필기나 점프 버튼을 놓는 중에는 한 손가락이 그 일을 한다.
+      panEnabled: !state.overlayEditing,
     );
   }
 
@@ -646,10 +721,19 @@ class _TapZones extends StatelessWidget {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.title, required this.state});
+  const _TopBar({
+    required this.title,
+    required this.state,
+    required this.sessionKey,
+    required this.onSelectTab,
+    required this.onCloseTab,
+  });
 
   final String title;
   final ViewerState state;
+  final SessionKey sessionKey;
+  final void Function(OpenTab) onSelectTab;
+  final void Function(OpenTab) onCloseTab;
 
   @override
   Widget build(BuildContext context) {
@@ -658,27 +742,38 @@ class _TopBar extends StatelessWidget {
       color: scheme.surface.withValues(alpha: 0.95),
       child: SafeArea(
         bottom: false,
-        child: SizedBox(
-          height: 56,
-          child: Row(
-            children: [
-              const BackButton(),
-              Expanded(
-                child: Text(
-                  title,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ScoreTabBar(
+              current: sessionKey,
+              onSelect: onSelectTab,
+              onClose: onCloseTab,
+              background: Colors.transparent,
+            ),
+            SizedBox(
+              height: 56,
+              child: Row(
+                children: [
+                  const BackButton(),
+                  Expanded(
+                    child: Text(
+                      title,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      '${state.pageIndex + 1} / ${state.pageCount}',
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  '${state.pageIndex + 1} / ${state.pageCount}',
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/db/score_dao.dart';
 import '../../../core/db/setlist_dao.dart';
 import '../../library/presentation/tag_manager_sheet.dart';
+import '../../viewer/domain/open_tabs.dart';
 import 'setlist_share_actions.dart';
 import '../../../core/i18n/tr.dart';
 
@@ -71,8 +72,10 @@ class SetlistPage extends ConsumerWidget {
                   child: const Icon(Icons.delete_outline),
                 ),
                 confirmDismiss: (_) => _confirmDelete(context, entry.setlist.name),
-                onDismissed: (_) =>
-                    ref.read(setlistDaoProvider).deleteSetlist(entry.setlist.id),
+                onDismissed: (_) {
+                  ref.read(setlistDaoProvider).deleteSetlist(entry.setlist.id);
+                  ref.read(openTabsProvider.notifier).closeIds([entry.setlist.id]);
+                },
                 child: ListTile(
                   leading: const Icon(Icons.queue_music),
                   title: Text(entry.setlist.name),
@@ -90,6 +93,9 @@ class SetlistPage extends ConsumerWidget {
                         case 'delete':
                           if (await _confirmDelete(context, entry.setlist.name)) {
                             await dao.deleteSetlist(entry.setlist.id);
+                            ref
+                                .read(openTabsProvider.notifier)
+                                .closeIds([entry.setlist.id]);
                           }
                       }
                     },

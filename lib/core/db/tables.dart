@@ -37,7 +37,13 @@ class Scores extends Table {
   IntColumn get turnAnimation => intEnum<TurnAnimation>().nullable()();
 
   /// 2페이지 보기에서 1페이지를 오른쪽에 둘지 여부.
+  /// 두 장씩 넘기는 경우에만 뜻이 있다.
   BoolColumn get startOnRight => boolean().withDefault(const Constant(false))();
+
+  /// 2페이지 보기에서 한 장씩 밀어 넘길지 여부.
+  /// 참이면 (1,2) (2,3) (3,4), 거짓이면 (1,2) (3,4) 로 넘어간다.
+  /// null 이면 기본값인 한 장씩을 따른다.
+  BoolColumn get dualStepOne => boolean().nullable()();
 
   /// 전체 페이지 공통 여백 크롭 비율 (0.0 ~ 0.45).
   RealColumn get cropLeft => real().withDefault(const Constant(0))();
