@@ -229,23 +229,30 @@ class PagedScoreViewState extends State<PagedScoreView>
 
   /// 종이를 접어 넘기는 화면.
   ///
-  /// 가만히 있을 때는 지금 묶음을 그리되, 이웃 묶음을 그 아래에 깔아 둔다.
-  /// 바탕색으로 덮여 보이지 않지만 이미지를 미리 받아 두고, 넘기기 시작할 때
-  /// 앞면과 뒷면 스냅샷을 뜰 수 있다. 넘기는 동안에는 드러날 장들을 아래에
-  /// 두고 그 위에 접힌 장을 그린다.
+  /// 이웃 묶음을 지금 묶음 아래에 늘 깔아 둔다. 바탕색으로 덮여 보이지 않지만
+  /// 이미지를 미리 받아 두고 스냅샷을 뜰 수 있다. 넘기는 동안에는 드러날
+  /// 이웃 묶음을 지금 묶음 위로 올리되 넘어가는 칸만 보이게 자르고, 그 위에
+  /// 접힌 장을 그린다.
+  ///
+  /// 넘김이 시작돼도 위젯을 새로 만들지 않는다. 열쇠가 같은 층을 순서만 바꿔
+  /// 쌓는다. 손가락 아래의 페이지(그 안의 PencilKit 네이티브 뷰)를 갈아
+  /// 끼우면 iOS 가 진행 중인 터치를 끊어 끌기가 몇 픽셀 만에 끝나 버린다.
   Widget _buildCurl() {
     final map = widget.map;
     final background = ViewerColors.canvasOf(Theme.of(context).brightness);
     final turn = _turn;
 
-    Widget spread(int index) {
+    Widget spread(int index, {Rect? clip}) {
       final pages = map.pagesOf(index);
-      return _Spread(
+      return ClipRect(
         key: ValueKey(index),
-        session: widget.session,
-        pages: pages,
-        overlayBuilder: widget.overlayBuilder,
-        pageKeys: [for (var i = 0; i < pages.length; i++) _keyFor(index, i)],
+        clipper: _SlotClipper(clip),
+        child: _Spread(
+          session: widget.session,
+          pages: pages,
+          overlayBuilder: widget.overlayBuilder,
+          pageKeys: [for (var i = 0; i < pages.length; i++) _keyFor(index, i)],
+        ),
       );
     }
 
@@ -256,7 +263,22 @@ class PagedScoreViewState extends State<PagedScoreView>
       layers.add(ColoredBox(color: background));
       layers.add(spread(_spread));
     } else {
-      layers.add(_underLayer(turn));
+      final forward = turn.dir == _TurnDir.forward;
+      final revealed = forward ? _spread + 1 : _spread - 1;
+      final other = forward ? _spread - 1 : _spread + 1;
+      if (other >= 0 && other < map.spreadCount) layers.add(spread(other));
+      layers.add(ColoredBox(color: background));
+      layers.add(spread(_spread));
+      // 넘어가는 칸을 바탕색으로 덮고 그 위에 이웃 묶음의 같은 칸을 드러낸다.
+      // 이웃 장의 크기가 살짝 달라도 옛 장이 가장자리로 비치지 않는다.
+      layers.add(
+        Positioned.fromRect(
+          rect: turn.rect,
+          child: ColoredBox(color: background),
+        ),
+      );
+      final reveal = turn.reveal;
+      if (reveal != null) layers.add(spread(revealed, clip: reveal));
       layers.add(
         IgnorePointer(
           child: CustomPaint(
@@ -285,26 +307,6 @@ class PagedScoreViewState extends State<PagedScoreView>
         _latestDrag = null;
       },
       child: Stack(fit: StackFit.expand, children: layers),
-    );
-  }
-
-  /// 넘기는 동안 접힌 장 아래에 보이는 장들. 자리는 넘기기 시작할 때 잰 값이다.
-  Widget _underLayer(_PageTurn turn) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        for (final slot in turn.under)
-          Positioned.fromRect(
-            rect: slot.rect,
-            child: Center(
-              child: ScorePageView(
-                session: widget.session,
-                page: widget.session.pages[slot.page],
-                overlayBuilder: widget.overlayBuilder,
-              ),
-            ),
-          ),
-      ],
     );
   }
 
@@ -449,25 +451,21 @@ class PagedScoreViewState extends State<PagedScoreView>
         b.localToGlobal(Offset.zero, ancestor: host) & b.size;
     final slotRects = [for (final b in slots) rectOf(b!)];
 
-    // 두 장 보기: 넘어가지 않는 칸은 남고, 넘어가는 칸 자리에는 이웃 묶음의
-    // 같은 쪽 장이 드러난다. 뒷면에는 이웃 묶음의 반대쪽 장이 인쇄된다.
-    // 한 장 보기: 아래에 이웃 장이 통째로 드러나고 뒷면은 없다.
+    // 넘어가는 칸 자리에는 이웃 묶음의 같은 칸이 드러난다. 이웃 묶음이 두
+    // 장이 아니면(끝의 홀수 쪽) 그 칸은 비워 둔다. 두 장 보기에서는 이웃
+    // 묶음의 반대쪽 장을 뒷면에 인쇄한다. 한 장 보기는 뒷면이 없다.
     final dual = cur.length == 2;
-    final under = <({Rect rect, int page})>[];
+    final reveal = !dual || neighbour.length == 2
+        ? slotRects[turningSlot]
+        : null;
     RenderRepaintBoundary? backBoundary;
     int? backPage;
     Rect? backRect;
-    if (dual) {
+    if (dual && neighbour.length == 2) {
       final stayingSlot = forward ? 0 : 1;
-      under.add((rect: slotRects[stayingSlot], page: cur[stayingSlot]));
-      if (neighbour.length == 2) {
-        under.add((rect: slotRects[turningSlot], page: neighbour[turningSlot]));
-        backBoundary = _boundary(neighbourIndex, stayingSlot);
-        backPage = neighbour[stayingSlot];
-        backRect = slotRects[stayingSlot];
-      }
-    } else {
-      under.add((rect: slotRects[0], page: neighbour[0]));
+      backBoundary = _boundary(neighbourIndex, stayingSlot);
+      backPage = neighbour[stayingSlot];
+      backRect = slotRects[stayingSlot];
     }
 
     // 느리게 끌면 화면이 안 바뀌어 프레임이 멈추고, 스냅샷도 그때까지 기다린다.
@@ -525,7 +523,7 @@ class PagedScoreViewState extends State<PagedScoreView>
         forward ? rect.right : rect.left,
         grabY < rect.center.dy ? rect.top : rect.bottom,
       ),
-      under: under,
+      reveal: reveal,
     );
     if (at != null) turn.finger = turn.clamp(_latestDrag ?? at);
 
@@ -699,7 +697,7 @@ class _PageTurn {
     required this.back,
     required this.rect,
     required this.corner,
-    required this.under,
+    required this.reveal,
   }) : finger = corner;
 
   final _TurnDir dir;
@@ -711,8 +709,8 @@ class _PageTurn {
   final Offset corner;
   Offset finger;
 
-  /// 접힌 장 아래에 보일 장들과 그 자리.
-  final List<({Rect rect, int page})> under;
+  /// 접힌 장 아래에 드러날 이웃 묶음의 칸. null 이면 그 칸은 비어 있다.
+  final Rect? reveal;
 
   bool get _forward => dir == _TurnDir.forward;
 
@@ -764,9 +762,24 @@ class _PageTurn {
   }
 }
 
+/// 묶음 층을 한 칸만 보이게 자른다. null 이면 자르지 않는다.
+///
+/// 넘기는 동안 이웃 묶음을 위로 올릴 때 쓴다. 층마다 늘 이 자르개를 두르기
+/// 때문에 순서를 바꿔도 위젯 구조가 같아 상태가 유지된다.
+class _SlotClipper extends CustomClipper<Rect> {
+  const _SlotClipper(this.rect);
+
+  final Rect? rect;
+
+  @override
+  Rect getClip(Size size) => rect ?? (Offset.zero & size);
+
+  @override
+  bool shouldReclip(_SlotClipper old) => old.rect != rect;
+}
+
 class _Spread extends StatelessWidget {
   const _Spread({
-    super.key,
     required this.session,
     required this.pages,
     this.overlayBuilder,
