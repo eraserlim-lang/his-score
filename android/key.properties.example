@@ -1,0 +1,8 @@
+# 릴리스 서명 설정 본보기.
+# 이 파일을 key.properties 로 복사해 값을 채운다. key.properties 는 .gitignore 에
+# 들어 있어 저장소에 올라가지 않는다. 키스토어와 비밀번호를 잃으면 같은 앱으로
+# 업데이트를 낼 수 없으니 따로 안전하게 보관한다.
+storeFile=/Users/mac/keys/hiscore-release.jks
+storePassword=키스토어_비밀번호
+keyAlias=hiscore
+keyPassword=키_비밀번호
