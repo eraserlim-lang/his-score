@@ -347,6 +347,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
             editing: state.editingJumps,
             onJump: _controller.goToPage,
             onPlace: (n) => _placeJump(page, n),
+            onEditRequested: () => _openPageMenu('jumps'),
           ),
       ],
     );
@@ -785,7 +786,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(tr('빈 곳을 눌러 점프 버튼을 놓으세요')),
+                                Text(tr('빈 곳을 눌러 놓고, 버튼을 끌어 옮기세요')),
                                 const SizedBox(width: 8),
                                 FilledButton.tonal(
                                   onPressed: () {
