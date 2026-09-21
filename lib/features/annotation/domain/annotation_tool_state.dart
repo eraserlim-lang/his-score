@@ -20,6 +20,9 @@ class AnnotationToolState extends ChangeNotifier {
   double _width = 1.0;
   double _eraserRadius = 14;
   String _stampId = 'f1';
+
+  /// 새로 찍는 스탬프를 네모 상자로 두를지.
+  bool _stampBoxed = false;
   ShapeKind _shape = ShapeKind.arrow;
   double _textSize = 28;
   bool _fingerDraws = false;
@@ -35,6 +38,7 @@ class AnnotationToolState extends ChangeNotifier {
   double get width => _width;
   double get eraserRadius => _eraserRadius;
   String get stampId => _stampId;
+  bool get stampBoxed => _stampBoxed;
   ShapeKind get shape => _shape;
   double get textSize => _textSize;
   bool get toolbarAtBottom => _toolbarAtBottom;
@@ -83,6 +87,12 @@ class AnnotationToolState extends ChangeNotifier {
   void setStamp(String id) {
     _stampId = id;
     _tool = InkTool.stamp;
+    notifyListeners();
+  }
+
+  void setStampBoxed(bool value) {
+    if (value == _stampBoxed) return;
+    _stampBoxed = value;
     notifyListeners();
   }
 

@@ -64,6 +64,12 @@ abstract final class SettingKeys {
   static const locale = 'ui.locale';
   static const themeMode = 'ui.themeMode';
   static const tapZoneWidth = 'viewer.tapZoneWidth';
+
+  /// 상단에 열어 둔 탭. 앱을 껐다 켜도 그대로 돌아온다.
+  static const openTabs = 'viewer.openTabs';
+
+  /// 화면 자동 꺼짐. 'always' | 'auto' | 'min:<분>'.
+  static const screenSleep = 'viewer.screenSleep';
 }
 
 final settingsDaoProvider =

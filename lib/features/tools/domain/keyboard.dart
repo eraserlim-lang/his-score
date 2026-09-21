@@ -71,6 +71,6 @@ class KeyboardController extends ChangeNotifier {
 
 final keyboardProvider = ChangeNotifierProvider<KeyboardController>((ref) {
   final c = KeyboardController();
-  ref.onDispose(c.dispose);
+  // ChangeNotifierProvider 가 알아서 dispose 한다. 여기서 또 부르면 두 번이다.
   return c;
 });

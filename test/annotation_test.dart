@@ -50,6 +50,40 @@ void main() {
       expect(back.strokes.single.points.length, 11);
       expect(back.placed.single.value, 'f3');
       expect(back.placed.single.color, const Color(0xFFFF0000));
+      expect(back.placed.single.boxed, isFalse);
+    });
+
+    test('상자를 두른 스탬프는 JSON 으로 왕복해도 상자를 지킨다', () {
+      const ink = PageInk(
+        placed: [
+          PlacedAnnotation(
+            id: 'p',
+            kind: PlacedKind.stamp,
+            value: 'intro',
+            x: 0.5,
+            y: 0.5,
+            color: Color(0xFF000000),
+            boxed: true,
+          ),
+        ],
+      );
+      expect(PageInk.fromJson(ink.toJson()).placed.single.boxed, isTrue);
+    });
+
+    test('상자 칸이 없는 옛 기록은 상자 없이 읽는다', () {
+      final back = PageInk.fromJson({
+        'placed': [
+          {
+            'id': 'p',
+            'kind': 'stamp',
+            'value': 'f1',
+            'x': 0.1,
+            'y': 0.1,
+            'color': 0xFF000000,
+          },
+        ],
+      });
+      expect(back.placed.single.boxed, isFalse);
     });
   });
 
@@ -131,6 +165,41 @@ void main() {
     Future<void> seedScore() => db.into(db.scores).insert(
           ScoresCompanion.insert(id: 's1', title: 't', filePath: 'x'),
         );
+
+    test('상자를 두른 스탬프가 DB 에 저장됐다 돌아온다', () async {
+      await seedScore();
+      await dao.upsertPlaced(
+        's1',
+        1,
+        const PlacedAnnotation(
+          id: 'boxed',
+          kind: PlacedKind.stamp,
+          value: 'verse',
+          x: 0.3,
+          y: 0.3,
+          color: Color(0xFF000000),
+          boxed: true,
+        ),
+      );
+      await dao.upsertPlaced(
+        's1',
+        1,
+        const PlacedAnnotation(
+          id: 'plain',
+          kind: PlacedKind.stamp,
+          value: 'f1',
+          x: 0.6,
+          y: 0.6,
+          color: Color(0xFF000000),
+        ),
+      );
+
+      final placed = {
+        for (final p in (await dao.loadPage('s1', 1)).placed) p.id: p,
+      };
+      expect(placed['boxed']!.boxed, isTrue);
+      expect(placed['plain']!.boxed, isFalse);
+    });
 
     test('획을 긋고 되돌리고 다시 하면 DB 도 따라온다', () async {
       await seedScore();
@@ -265,6 +334,134 @@ void main() {
       expect(controller.canUndo, isTrue);
       await controller.flush();
       expect((await dao.loadPage('s1', 1)).strokes.length, 1);
+    });
+
+    testWidgets('스탬프를 골라 지운 뒤에도 계속 찍고 지울 수 있다', (tester) async {
+      await db.into(db.scores).insert(
+            ScoresCompanion.insert(id: 's1', title: 't', filePath: 'x'),
+          );
+      final controller = PageInkController(
+        dao: AnnotationDao(db),
+        scoreId: 's1',
+        page: 1,
+      );
+      await controller.load();
+      final tools = AnnotationToolState()..setStamp('f1');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 300,
+              height: 400,
+              child: InkLayer(
+                controller: controller,
+                crop: const Rect.fromLTRB(0, 0, 1, 1),
+                rotation: 0,
+                editing: true,
+                tools: tools,
+              ),
+            ),
+          ),
+        ),
+      );
+      final origin = tester.getTopLeft(find.byType(InkLayer));
+
+      // 손가락은 누르고 떼는 사이에 화면이 한 번은 다시 그려진다. 그 사이에
+      // 필기 층의 모양이 바뀌면 떼었다는 소식을 놓친다. 그 틈을 그대로 둔다.
+      Future<void> tapAt(Offset local) async {
+        final g = await tester.startGesture(
+          origin + local,
+          kind: PointerDeviceKind.mouse,
+        );
+        await tester.pump();
+        await g.up();
+        await tester.pump();
+      }
+
+      // 세 개를 찍는다.
+      await tapAt(const Offset(60, 80));
+      await tapAt(const Offset(150, 200));
+      await tapAt(const Offset(240, 320));
+      expect(controller.ink.placed.length, 3);
+
+      // 가운데 것을 골라 지운다.
+      tools.setTool(InkTool.select);
+      await tester.pump();
+      await tapAt(const Offset(150, 200));
+      await tester.tap(find.byIcon(Icons.delete));
+      await tester.pump();
+      expect(controller.ink.placed.length, 2);
+
+      // 다시 찍을 수 있어야 한다.
+      tools.setStamp('f2');
+      await tester.pump();
+      await tapAt(const Offset(150, 120));
+      expect(controller.ink.placed.length, 3);
+
+      // 다른 것을 골라 또 지울 수도 있어야 한다.
+      tools.setTool(InkTool.select);
+      await tester.pump();
+      await tapAt(const Offset(60, 80));
+      await tester.tap(find.byIcon(Icons.delete));
+      await tester.pump();
+      expect(controller.ink.placed.length, 2);
+    });
+
+    testWidgets('그리는 도중 필기 층이 내려가도 획을 잃지 않고 탈도 없다', (tester) async {
+      await db.into(db.scores).insert(
+            ScoresCompanion.insert(id: 's1', title: 't', filePath: 'x'),
+          );
+      final controller = PageInkController(
+        dao: AnnotationDao(db),
+        scoreId: 's1',
+        page: 1,
+      );
+      await controller.load();
+      var shown = true;
+      late StateSetter update;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              update = setState;
+              return Center(
+                child: SizedBox(
+                  width: 300,
+                  height: 400,
+                  child: shown
+                      ? InkLayer(
+                          controller: controller,
+                          crop: const Rect.fromLTRB(0, 0, 1, 1),
+                          rotation: 0,
+                          editing: true,
+                          tools: AnnotationToolState(),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      // 긋는 도중에 쪽이 넘어간 것처럼 층을 내린다. 손은 아직 떼지 않았다.
+      final g = await tester.startGesture(
+        tester.getCenter(find.byType(InkLayer)),
+        kind: PointerDeviceKind.mouse,
+      );
+      for (var i = 0; i < 6; i++) {
+        await g.moveBy(const Offset(15, 4));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      update(() => shown = false);
+      await tester.pump();
+      await tester.pump();
+      await g.up();
+
+      expect(tester.takeException(), isNull);
+      expect(controller.ink.strokes.length, 1);
     });
 
     testWidgets('보기 모드에서는 입력을 받지 않는다', (tester) async {

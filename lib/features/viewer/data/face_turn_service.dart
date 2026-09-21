@@ -68,6 +68,43 @@ class FaceTurnService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 카메라를 원하는 두 가지 이유. 둘 중 하나라도 있으면 켠다.
+  bool _gestures = false;
+  bool _presence = false;
+
+  /// 윙크로 넘기는 기능이 켜져 있는지. 화면 꺼짐 막기로만 켠 동안에는 거짓이라
+  /// 눈을 감아도 페이지가 넘어가지 않는다.
+  bool get gesturesOn => _gestures;
+
+  /// 사람이 보고 있는지만 보려고 켜 둔 상태.
+  bool get presenceOn => _presence;
+
+  /// 윙크 넘김을 켜고 끈다.
+  Future<void> setGestures(bool on) async {
+    if (on == _gestures) return;
+    _gestures = on;
+    await _sync();
+  }
+
+  /// 화면 꺼짐을 막으려고 얼굴만 지켜보는 상태를 켜고 끈다.
+  Future<void> setPresence(bool on) async {
+    if (on == _presence) return;
+    _presence = on;
+    await _sync();
+  }
+
+  /// 원하는 쪽이 하나라도 있으면 카메라를 켜고, 없으면 끈다.
+  Future<void> _sync() async {
+    final want = _gestures || _presence;
+    if (want && !_running) {
+      await start();
+    } else if (!want && _running) {
+      await stop();
+    } else {
+      notifyListeners();
+    }
+  }
+
   bool get running => _running;
   String? get error => _error;
   bool get faceVisible => _faceVisible;
@@ -116,6 +153,8 @@ class FaceTurnService extends ChangeNotifier {
   }
 
   Future<void> stop() async {
+    _gestures = false;
+    _presence = false;
     _running = false;
     final cam = _camera;
     _camera = null;
@@ -161,6 +200,13 @@ class FaceTurnService extends ChangeNotifier {
     if (faces.isEmpty) {
       _leftClosedSince = _rightClosedSince = null;
       _setPhase(WinkPhase.noFace);
+      return;
+    }
+    // 화면을 켜 두려고만 보고 있다면 눈까지 읽지 않는다.
+    // 여기서 넘겨 버리면 켠 적 없는 기능이 제멋대로 도는 셈이다.
+    if (!_gestures) {
+      _leftClosedSince = _rightClosedSince = null;
+      _setPhase(WinkPhase.eyesOpen);
       return;
     }
     final face = faces.first;
@@ -275,8 +321,18 @@ class FaceTurnService extends ChangeNotifier {
     );
   }
 
+  /// dispose 에 들어온 뒤로는 알리지 않는다. 카메라 끄기가 비동기라
+  /// dispose 가 끝난 뒤에 알림이 늦게 도착한다.
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     stop();
     super.dispose();
   }

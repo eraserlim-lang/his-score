@@ -7,7 +7,9 @@ import '../i18n/tr.dart';
 /// 아이패드는 앱이 OS 창을 따로 띄울 수 없다. 그래서 앱 화면 위에 얹어
 /// 악보를 보면서 도구를 쓸 수 있게 한다. 제목 줄을 끌어 옮기고, 오른쪽
 /// 아래 모서리를 끌어 크기를 바꾸고, 접어 두면 제목 줄만 남는다.
-void showFloatingWindow({
+///
+/// 창을 닫는 함수를 돌려준다. 창이 어떤 길로든 닫히면 [onClosed] 를 부른다.
+VoidCallback showFloatingWindow({
   required BuildContext context,
   required String title,
   required Widget Function(BuildContext context, VoidCallback close) builder,
@@ -16,21 +18,28 @@ void showFloatingWindow({
   /// 내용이 창보다 길면 스크롤할지. 안쪽에서 남은 높이를 직접 나눠 쓰는
   /// 화면(Expanded 를 쓰는 것들)은 꺼야 한다.
   bool scrollable = true,
+
+  VoidCallback? onClosed,
 }) {
   final overlay = Overlay.of(context, rootOverlay: true);
   late OverlayEntry entry;
+  void close() {
+    if (!entry.mounted) return;
+    entry.remove();
+    onClosed?.call();
+  }
+
   entry = OverlayEntry(
     builder: (context) => _FloatingWindow(
       title: title,
       initialSize: initialSize,
       scrollable: scrollable,
       builder: builder,
-      onClose: () {
-        if (entry.mounted) entry.remove();
-      },
+      onClose: close,
     ),
   );
   overlay.insert(entry);
+  return close;
 }
 
 class _FloatingWindow extends StatefulWidget {

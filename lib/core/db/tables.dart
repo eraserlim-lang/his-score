@@ -236,6 +236,11 @@ class Annotations extends Table {
   RealColumn get fontSize => real().nullable()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
+  /// 스탬프를 네모 상자로 두르는지. 송폼 표시(Intro, A 파트)는 인쇄 악보에서도
+  /// 상자로 두른 리허설 마크로 쓴다. null 이면 두르지 않는다. 옛 백업에는 이
+  /// 칸이 없어 비워 둘 수 있어야 한다.
+  BoolColumn get boxed => boolean().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

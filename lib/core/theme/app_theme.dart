@@ -56,6 +56,10 @@ abstract final class ViewerColors {
   static Color canvasOf(Brightness brightness) =>
       brightness == Brightness.dark ? canvas : canvasLight;
 
+  /// 종이의 가장자리. 밝은 테마는 배경도 흰색이라 이 선이 없으면 페이지가
+  /// 어디서 끝나는지 보이지 않는다. 1페이지 보기에서 넘겼는지조차 모른다.
+  static const pageEdge = Color(0x33000000);
+
   /// 필기 기본 6색. Piascore 와 같은 구성에 가독성을 맞췄다.
   static const inkColors = <Color>[
     Color(0xFF1A1A1A), // 검정

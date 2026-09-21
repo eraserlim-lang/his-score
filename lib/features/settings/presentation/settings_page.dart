@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/settings_dao.dart';
+import '../../viewer/data/face_turn_service.dart';
+import '../../viewer/domain/screen_sleep.dart';
 import '../../../core/i18n/tr.dart';
 import '../../backup/presentation/backup_tiles.dart';
 import '../../importer/data/watch_folder_service.dart';
@@ -98,6 +100,7 @@ class SettingsPage extends ConsumerWidget {
           _SectionHeader(tr('화면')),
           const _LanguageTile(),
           const _ThemeTile(),
+          const _ScreenSleepTile(),
           _SectionHeader(tr('페이지 넘김')),
           const _PedalTile(),
           ListTile(
@@ -313,6 +316,54 @@ class _LanguageTile extends ConsumerWidget {
         PopupMenuItem(value: 'system', child: Text(AppLocale.labelOf(null))),
         for (final l in AppLocale.supported)
           PopupMenuItem(value: l.languageCode, child: Text(AppLocale.labelOf(l))),
+      ],
+    );
+  }
+}
+
+/// 악보를 보는 동안 화면을 언제 끌지.
+///
+/// 연주 중에 화면이 꺼지면 악보가 사라진다. 그렇다고 늘 켜 두면 가방 속에서
+/// 배터리가 녹는다. 그 사이를 고르게 한다.
+class _ScreenSleepTile extends ConsumerWidget {
+  const _ScreenSleepTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(screenSleepProvider);
+
+    String label(ScreenSleep s) => switch (s.mode) {
+      ScreenSleepMode.never => tr('끄지 않음'),
+      ScreenSleepMode.watching => tr('자동 (보고 있으면 켜 둠)'),
+      ScreenSleepMode.timed => tr('{0}분 뒤 꺼짐', [s.minutes]),
+    };
+
+    return _ChoiceTile<ScreenSleep>(
+      icon: Icons.brightness_high_outlined,
+      title: tr('화면 자동 꺼짐'),
+      value: label(current),
+      subtitle: current.mode == ScreenSleepMode.watching
+          ? tr('전면 카메라로 얼굴이 보이는지만 확인합니다')
+          : null,
+      onSelected: (v) =>
+          ref.read(settingsDaoProvider).set(SettingKeys.screenSleep, v.encode()),
+      items: (context) => [
+        for (final m in ScreenSleep.minuteChoices)
+          PopupMenuItem(
+            value: ScreenSleep(ScreenSleepMode.timed, minutes: m),
+            child: Text(tr('{0}분 뒤 꺼짐', [m])),
+          ),
+        // 얼굴을 보려면 카메라가 있어야 한다. 데스크톱에서는 내놓지 않는다.
+        if (FaceTurnService.supported)
+          PopupMenuItem(
+            value: const ScreenSleep(ScreenSleepMode.watching),
+            child: Text(tr('자동 (보고 있으면 켜 둠)')),
+          ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: const ScreenSleep(ScreenSleepMode.never),
+          child: Text(tr('끄지 않음')),
+        ),
       ],
     );
   }

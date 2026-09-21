@@ -143,24 +143,52 @@ class _RailHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final extended = Breakpoints.of(context).isExpanded;
+    // 레일이 좁을 때도 같은 모습이어야 로고로 읽힌다. 아이콘을 위에 놓고
+    // 이름을 그 아래 받친다. 옆으로 늘어놓으면 접힌 레일에서 글자가 잘린다.
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: extended
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.music_note, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'HIScore',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+      padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AppIcon(size: 32),
+          const SizedBox(height: 6),
+          Text(
+            'HIScore',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-            )
-          : Icon(Icons.music_note, color: Theme.of(context).colorScheme.primary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 앱 아이콘. 좌측 레일 머리에 건다.
+///
+/// 아이콘 원본은 바탕이 꽉 찬 정사각형이라 그대로 두면 네모 판처럼 보인다.
+/// 기기 홈 화면과 같은 둥근 모서리로 깎아 건다. 어두운 테마에서는 디자인이
+/// 따로 내준 어두운 판을 쓴다. 밝은 판을 두면 화면에 흰 네모가 뜬다.
+/// 원본은 design/icon 의 SVG 이고 tool/icons/build_icons.sh 가 굽는다.
+class AppIcon extends StatelessWidget {
+  const AppIcon({super.key, this.size = 28});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return ClipRRect(
+      // iOS 홈 화면과 비슷한 비율. 너무 둥글면 음표가 잘린다.
+      borderRadius: BorderRadius.circular(size * 0.23),
+      child: Image.asset(
+        dark ? 'assets/icon/hiscore_dark.png' : 'assets/icon/hiscore.png',
+        width: size,
+        height: size,
+        filterQuality: FilterQuality.medium,
+      ),
     );
   }
 }

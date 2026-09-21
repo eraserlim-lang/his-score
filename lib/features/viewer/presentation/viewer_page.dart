@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/score_dao.dart';
+import '../../../core/layout/page_preview_scope.dart';
 import '../../../core/layout/center_sheet.dart';
 import '../../../core/db/tables.dart';
 import '../../../core/theme/app_theme.dart';
@@ -17,6 +18,7 @@ import '../../annotation/domain/annotation_tool_state.dart';
 import '../../annotation/presentation/annotation_toolbar.dart';
 import '../../annotation/presentation/ink_layer.dart';
 import '../../export/presentation/export_sheet.dart';
+import '../../settings/presentation/settings_page.dart';
 import '../../sync/presentation/sync_sheet.dart';
 import '../../tools/presentation/tools_panel.dart';
 import '../../../core/db/settings_dao.dart';
@@ -26,6 +28,7 @@ import '../../../core/db/database.dart';
 import '../data/page_tools_dao.dart';
 import '../data/score_session.dart';
 import '../domain/open_tabs.dart';
+import '../domain/screen_sleep.dart';
 import '../domain/spreads.dart';
 import '../domain/viewer_controller.dart';
 import 'pages/page_order_page.dart';
@@ -102,6 +105,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
 
   /// dispose 에서는 ref 를 쓸 수 없어 미리 잡아 둔다.
   late final FaceTurnService _faceTurn;
+
+  /// 보는 동안 화면이 꺼지지 않게 붙잡아 둔다.
+  late final ScreenAwake _awake;
   final _tools = AnnotationToolState();
   bool _chromeVisible = true;
 
@@ -122,8 +128,54 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
         _armChromeTimer();
         return;
       }
+      // 슬라이더를 끌고 있는데 막대를 거두면 손가락 밑에서 사라진다.
+      // 페이지가 많으면 훑는 데 5초가 넘게 걸린다.
+      if (_controller.state.scrubbing) {
+        _armChromeTimer();
+        return;
+      }
       setState(() => _chromeVisible = false);
     });
+  }
+
+  /// 화면 위에 잠깐 띄우는 말. 넘긴 뒤의 쪽 위치나 끝에 닿았다는 알림이다.
+  /// 사라질 때 글자가 비면 깜빡여 보여 글자는 남기고 보임만 끈다.
+  String _flashText = '';
+  bool _flashVisible = false;
+  Timer? _flashTimer;
+
+  /// 말을 띄운다. 이어서 오면 글자만 바꾸고 시간을 새로 센다.
+  void _flash(String text) {
+    if (!mounted) return;
+    if (_flashText != text || !_flashVisible) {
+      setState(() {
+        _flashText = text;
+        _flashVisible = true;
+      });
+    }
+    _flashTimer?.cancel();
+    _flashTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _flashVisible = false);
+    });
+  }
+
+  /// 첫 장/마지막 장에서 더 넘기려 했을 때.
+  void _showEdge(TurnEdge edge) => _flash(
+    edge == TurnEdge.first ? tr('첫 페이지입니다') : tr('마지막 페이지입니다'),
+  );
+
+  /// 넘긴 뒤 지금 몇 쪽인지 알린다. 위 막대를 거둔 채 넘기면 쪽 번호가
+  /// 어디에도 보이지 않는다. 2페이지 보기는 보이는 두 쪽을 함께 적는다.
+  void _announcePage(int pageIndex) {
+    final state = _controller.state;
+    final map = _spreadMapFor(state);
+    final pages = state.isPaged
+        ? map.pagesOf(map.spreadOf(pageIndex))
+        : [pageIndex];
+    final shown = pages.length > 1
+        ? '${pages.first + 1}–${pages.last + 1}'
+        : '${(pages.isEmpty ? pageIndex : pages.first) + 1}';
+    _flash('$shown / ${state.pageCount}');
   }
 
   late final TurnInputHub _hub;
@@ -156,10 +208,12 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
             ),
           )
           ..onPageChanged = _handlePageChanged
+          ..onEdgeReached = _showEdge
           ..addListener(_persistViewSettings);
 
     _inkStore = InkStore(ref.read(annotationDaoProvider));
     _faceTurn = ref.read(faceTurnServiceProvider);
+    _awake = ScreenAwake(_faceTurn)..apply(ref.read(screenSleepProvider));
     _armChromeTimer();
 
     // 페달, 얼굴 제스처, 리모컨, 리드 기기가 보내는 명령을 받는다.
@@ -181,7 +235,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
             widget.session.title,
             page: _controller.state.pageIndex,
           );
-      _handlePageChanged(_controller.state.pageIndex);
+      _handlePageChanged(_controller.state.pageIndex, announce: false);
     });
   }
 
@@ -193,7 +247,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     // 보던 자리로 돌아간다. 페달과 필기는 그대로 살려 둔다.
     _controller.resize(widget.session.pageCount, widget.initialPage);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _handlePageChanged(_controller.state.pageIndex);
+      if (mounted) {
+        _handlePageChanged(_controller.state.pageIndex, announce: false);
+      }
     });
   }
 
@@ -224,6 +280,8 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   @override
   void dispose() {
     _chromeTimer?.cancel();
+    _flashTimer?.cancel();
+    _awake.dispose();
     HardwareKeyboard.instance.removeHandler(_onKey);
     _hubSub?.cancel();
     _remoteSub?.cancel();
@@ -324,6 +382,13 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     ref.invalidate(scoreSessionProvider(widget.session.key));
   }
 
+  /// 슬라이더를 잡고 놓는 동안의 처리. 놓는 순간 마지막 자리를 마무리한다.
+  void _setScrubbing(bool value) {
+    _controller.setScrubbing(value);
+    if (!value) _handlePageChanged(_controller.state.pageIndex);
+    _armChromeTimer();
+  }
+
   /// 다른 탭으로 옮겨 간다. 보기 화면은 한 장만 쌓아 둔다.
   void _selectTab(OpenTab tab) =>
       context.pushReplacement('${tab.location}?page=${tab.page}');
@@ -421,7 +486,6 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   }
 
   Future<void> _openPageMenu(String action) async {
-    final state = _controller.state;
     switch (action) {
       case 'bookmarks':
         await showBookmarksSheet(
@@ -476,16 +540,6 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
               .where((p) => p.scoreId == score.id)
               .length,
         );
-      case 'startOnRight':
-        _controller.setStartOnRight(!state.startOnRight);
-      case 'dualStepOne':
-        _controller.setDualStepOne(!state.dualStepOne);
-      case 'anim_slide':
-        _controller.setAnimation(TurnAnimation.slide);
-      case 'anim_stack':
-        _controller.setAnimation(TurnAnimation.stack);
-      case 'anim_curl':
-        _controller.setAnimation(TurnAnimation.curl);
     }
   }
 
@@ -559,8 +613,22 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     }
   }
 
-  void _handlePageChanged(int pageIndex) {
+  void _handlePageChanged(int pageIndex, {bool announce = true}) {
     if (pageIndex < 0 || pageIndex >= widget.session.pageCount) return;
+
+    // 훑는 중에는 지나치는 쪽마다 DB 를 쓰거나 다른 기기를 끌고 다니지
+    // 않는다. 손을 놓은 자리에서 한 번만 마무리한다.
+    if (_controller.state.scrubbing) {
+      // 미리 굽기도 하지 않는다. 스쳐 갈 쪽의 이웃을 제 해상도로 굽는 건
+      // 일꾼의 줄만 막는다. 보이는 쪽은 페이지가 스스로 거칠게 굽는다.
+      ref
+          .read(openTabsProvider.notifier)
+          .updatePage(widget.session.key, pageIndex);
+      return;
+    }
+
+    // 훑는 동안은 슬라이더가 쪽 번호를 들고 있다. 손을 놓은 뒤에 알린다.
+    if (announce) _announcePage(pageIndex);
 
     // 탭으로 돌아왔을 때 이 자리에서 다시 시작한다.
     ref
@@ -619,6 +687,9 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     final isLandscape = size.aspectRatio > 1;
     _renderWidth = size.width * MediaQuery.devicePixelRatioOf(context);
 
+    // 설정에서 바꾸면 보고 있는 중에도 곧바로 따른다.
+    ref.listen(screenSleepProvider, (_, next) => _awake.apply(next));
+
     return ListenableBuilder(
       listenable: _controller,
       builder: (context, _) {
@@ -644,11 +715,17 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
             child: Listener(
               behavior: HitTestBehavior.translucent,
               onPointerDown: (_) {
+                _awake.touch();
                 if (_chromeVisible) _armChromeTimer();
               },
               child: Stack(
                 children: [
-                  Positioned.fill(child: _buildContent(state)),
+                  Positioned.fill(
+                    child: PagePreviewScope(
+                      preview: state.scrubbing,
+                      child: _buildContent(state),
+                    ),
+                  ),
                   if (!state.overlayEditing)
                     Positioned.fill(
                       child: _TapZones(
@@ -656,6 +733,42 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                         onLongPress: _showPageActions,
                       ),
                     ),
+                  Positioned(
+                    // 메뉴가 떠 있으면 상단 바에 가리지 않게 그 아래로 내린다.
+                    top:
+                        MediaQuery.paddingOf(context).top +
+                        (_chromeVisible && !state.performanceMode ? 112 : 24),
+                    left: 0,
+                    right: 0,
+                    child: IgnorePointer(
+                      child: AnimatedOpacity(
+                        opacity: _flashVisible ? 1 : 0,
+                        duration: const Duration(milliseconds: 160),
+                        child: Center(
+                          child: Material(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.inverseSurface.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              child: Text(
+                                _flashText,
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onInverseSurface,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   if (state.editingJumps)
                     Positioned(
                       top: MediaQuery.paddingOf(context).top + 8,
@@ -720,14 +833,6 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                       ),
                     ),
                     Positioned(
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      child: Center(
-                        child: ToolRail(scoreId: _currentPage.scoreId),
-                      ),
-                    ),
-                    Positioned(
                       bottom: 0,
                       left: 0,
                       right: 0,
@@ -737,6 +842,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                           _PageSlider(
                             state: state,
                             onChanged: _controller.goToPage,
+                            onScrub: _setScrubbing,
                           ),
                           ViewerToolbar(
                             state: state,
@@ -744,9 +850,22 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
                             isLandscape: isLandscape,
                             onPageMenu: _openPageMenu,
                             onSync: () => showSyncSheet(context),
+                            // 악보 위에 얹어 연다. 닫으면 보던 쪽으로 돌아온다.
+                            onSettings: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => SettingsPage(),
+                              ),
+                            ),
                             faceGesture: FaceTurnService.supported
                                 ? ref.watch(faceTurnServiceProvider)
                                 : null,
+                            // 음악 도구는 예전 왼쪽 세로 판에서 막대 왼쪽 끝으로
+                            // 내려왔다. 악보 왼쪽 가장자리를 가리지 않는다.
+                            leading: (collapsed) => MusicToolButtons(
+                              scoreId: _currentPage.scoreId,
+                              collapsed: collapsed,
+                            ),
+                            leadingButtons: MusicTool.values.length,
                           ),
                         ],
                       ),
@@ -802,6 +921,13 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     return '${widget.session.title} · ${widget.session.scoreOf(page).title}';
   }
 
+  SpreadMap _spreadMapFor(ViewerState state) => SpreadMap(
+    pageCount: state.pageCount,
+    layout: state.layout,
+    startOnRight: state.startOnRight,
+    stepOne: state.dualStepOne,
+  );
+
   Widget _buildContent(ViewerState state) {
     if (state.isStrip) {
       return StripScoreView(
@@ -818,16 +944,13 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
 
     return PagedScoreView(
       session: widget.session,
-      map: SpreadMap(
-        pageCount: state.pageCount,
-        layout: state.layout,
-        startOnRight: state.startOnRight,
-        stepOne: state.dualStepOne,
-      ),
+      map: _spreadMapFor(state),
       animation: state.animation,
       pageIndex: state.pageIndex,
       onPageChanged: _controller.reportPageChanged,
       overlayBuilder: _inkOverlay,
+      onEdge: _controller.reportEdge,
+      scrubbing: state.scrubbing,
       // 필기나 점프 버튼을 놓는 중에는 한 손가락이 그 일을 한다.
       panEnabled: !state.overlayEditing,
     );
@@ -1070,27 +1193,60 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _PageSlider extends StatelessWidget {
-  const _PageSlider({required this.state, required this.onChanged});
+/// 아래에서 페이지를 훑는 슬라이더.
+///
+/// 손가락 자리는 화면이 따라오기를 기다리지 않는다. 끄는 동안에는 여기 있는
+/// 값을 그대로 보여 주고, 뷰어에는 옮겨 갈 쪽만 알린다. 악보가 두꺼우면
+/// 한 칸이 곧 한 장이라 되돌아오는 값을 기다렸다가는 손가락이 튕긴다.
+class _PageSlider extends StatefulWidget {
+  const _PageSlider({
+    required this.state,
+    required this.onChanged,
+    required this.onScrub,
+  });
 
   final ViewerState state;
   final ValueChanged<int> onChanged;
+  final ValueChanged<bool> onScrub;
+
+  @override
+  State<_PageSlider> createState() => _PageSliderState();
+}
+
+class _PageSliderState extends State<_PageSlider> {
+  /// 끄는 동안의 손가락 자리. 놓으면 null 로 돌아가 뷰어를 따른다.
+  double? _dragging;
 
   @override
   Widget build(BuildContext context) {
+    final state = widget.state;
     if (state.pageCount <= 1) return const SizedBox.shrink();
+
+    final max = (state.pageCount - 1).toDouble();
+    final value = (_dragging ?? state.pageIndex.toDouble()).clamp(0.0, max);
 
     return Material(
       color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
       child: Slider(
-        value: state.pageIndex.toDouble().clamp(
-          0,
-          (state.pageCount - 1).toDouble(),
-        ),
-        max: (state.pageCount - 1).toDouble(),
-        divisions: state.pageCount - 1,
-        label: tr('{0}쪽', [state.pageIndex + 1]),
-        onChanged: (v) => onChanged(v.round()),
+        value: value,
+        max: max,
+        // 쪽이 많으면 눈금이 촘촘해 오히려 지저분하다. 한 칸이 한 장인 것은
+        // 값을 반올림해 지킨다.
+        divisions: state.pageCount <= 30 ? state.pageCount - 1 : null,
+        label: tr('{0}쪽', [value.round() + 1]),
+        onChangeStart: (v) {
+          setState(() => _dragging = v);
+          widget.onScrub(true);
+        },
+        onChanged: (v) {
+          setState(() => _dragging = v);
+          widget.onChanged(v.round());
+        },
+        onChangeEnd: (v) {
+          widget.onChanged(v.round());
+          setState(() => _dragging = null);
+          widget.onScrub(false);
+        },
       ),
     );
   }

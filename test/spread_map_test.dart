@@ -121,6 +121,51 @@ void main() {
     });
   });
 
+  group('짝 없는 한 장이 서는 자리', () {
+    test('첫 장을 오른쪽에 두면 그 장은 오른쪽 반에 선다', () {
+      const map = SpreadMap(
+        pageCount: 5,
+        layout: PageLayout.dual,
+        startOnRight: true,
+      );
+      expect(map.pagesOf(0), [0]);
+      expect(map.slotOf(0), PageSlot.right);
+      // 두 장이 함께 선 묶음은 나눌 것이 없다.
+      expect(map.slotOf(1), PageSlot.center);
+    });
+
+    test('끝에 홀로 남은 장은 왼쪽 반에 선다', () {
+      const map = SpreadMap(
+        pageCount: 5,
+        layout: PageLayout.dual,
+        startOnRight: false,
+      );
+      expect(map.pagesOf(2), [4]);
+      expect(map.slotOf(2), PageSlot.left);
+    });
+
+    test('1페이지 보기는 늘 가운데다', () {
+      const map = SpreadMap(
+        pageCount: 3,
+        layout: PageLayout.single,
+        startOnRight: true,
+      );
+      expect(map.slotOf(0), PageSlot.center);
+    });
+
+    test('한 장씩 밀 때 마지막 장은 왼쪽 반에 선다', () {
+      const map = SpreadMap(
+        pageCount: 5,
+        layout: PageLayout.dual,
+        startOnRight: true,
+        stepOne: true,
+      );
+      // 한 장씩 밀면 첫 장도 짝이 있다. 첫 장 오른쪽 두기는 뜻을 잃는다.
+      expect(map.slotOf(0), PageSlot.center);
+      expect(map.slotOf(4), PageSlot.left);
+    });
+  });
+
   test('빈 악보에서도 터지지 않는다', () {
     const empty = SpreadMap(
       pageCount: 0,

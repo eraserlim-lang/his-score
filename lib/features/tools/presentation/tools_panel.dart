@@ -15,16 +15,26 @@ import '../../../core/i18n/tr.dart';
 
 /// 음악 도구 종류.
 enum MusicTool {
-  metronome('메트로놈', Icons.av_timer),
-  keyboard('건반', Icons.piano),
-  tuner('튜너', Icons.graphic_eq),
-  recorder('녹음기', Icons.mic_none),
-  player('플레이어', Icons.music_note);
+  metronome('메트로놈', Icons.av_timer, Icons.timer),
+  keyboard('건반', Icons.piano_outlined, Icons.piano),
+  tuner('튜너', Icons.graphic_eq, Icons.equalizer),
+  recorder('녹음기', Icons.mic_none, Icons.mic),
+  player('플레이어', Icons.music_note_outlined, Icons.music_note);
 
-  const MusicTool(this.label, this.icon);
+  const MusicTool(this.label, this.icon, this.activeIcon);
   final String label;
   final IconData icon;
+
+  /// 도구가 돌고 있을 때의 아이콘. 비어 있던 모양이 채워진다.
+  final IconData activeIcon;
 }
+
+/// 떠 있는 도구 창. 도구마다 하나만 띄운다.
+///
+/// 예전에는 누를 때마다 새 창을 띄워 같은 메트로놈이 두 개씩 떴다. 이제는
+/// 이미 떠 있으면 누를 때 닫는다. 창이 떠 있는 도구는 아래 막대에서
+/// 돌고 있는 것으로 보인다.
+final openToolWindows = ValueNotifier<Map<MusicTool, VoidCallback>>(const {});
 
 Widget _toolBody(MusicTool tool, String? scoreId) => switch (tool) {
   MusicTool.metronome => const MetronomePanel(),
@@ -100,7 +110,15 @@ void openMusicToolWindow(
   MusicTool tool, {
   String? scoreId,
 }) {
-  showFloatingWindow(
+  final opened = openToolWindows.value[tool];
+  if (opened != null) {
+    opened();
+    return;
+  }
+  final close = showFloatingWindow(
+    onClosed: () {
+      openToolWindows.value = {...openToolWindows.value}..remove(tool);
+    },
     context: context,
     title: tr(tool.label),
     // 건반은 옆으로 넓어야 짚을 만하고, 메트로놈은 조절할 것이 많아 높다.
@@ -113,35 +131,77 @@ void openMusicToolWindow(
     },
     builder: (context, close) => _toolBody(tool, scoreId),
   );
+  openToolWindows.value = {...openToolWindows.value, tool: close};
 }
 
-/// 뷰어 왼쪽에 세로로 붙는 도구 버튼들.
-class ToolRail extends ConsumerWidget {
-  const ToolRail({super.key, this.scoreId});
+/// 음악 도구 버튼 묶음. 악보 보기 아래 막대의 왼쪽에 가로로 늘어놓는다.
+///
+/// 예전에는 화면 왼쪽 가운데에 세로 판으로 떠 있어 악보 왼쪽 가장자리를
+/// 가렸다. 아래 막대로 내려 악보를 비운다. 막대가 좁으면(폰 세로) 다섯 개를
+/// 다 늘어놓을 자리가 없어 버튼 하나로 접고 메뉴로 연다.
+class MusicToolButtons extends ConsumerWidget {
+  const MusicToolButtons({super.key, this.scoreId, this.collapsed = false});
 
   final String? scoreId;
+
+  /// 버튼 하나로 접을지.
+  final bool collapsed;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final metronome = ref.watch(metronomeProvider);
     final player = ref.watch(musicPlayerProvider);
     final recorder = ref.watch(recorderProvider);
+    final tuner = ref.watch(tunerProvider);
     final scheme = Theme.of(context).colorScheme;
 
-    bool active(MusicTool t) => switch (t) {
-      MusicTool.metronome => metronome.running,
-      MusicTool.player => player.hasTrack,
-      MusicTool.recorder => recorder.recording,
-      _ => false,
-    };
+    return ValueListenableBuilder(
+      valueListenable: openToolWindows,
+      builder: (context, windows, _) {
+        // 소리를 내거나 듣고 있으면, 또는 창이 떠 있으면 돌고 있는 것이다.
+        // 창을 닫아도 메트로놈과 재생은 계속되니 둘 다 본다.
+        bool active(MusicTool t) =>
+            windows.containsKey(t) ||
+            switch (t) {
+              MusicTool.metronome => metronome.running,
+              MusicTool.player => player.hasTrack,
+              MusicTool.recorder => recorder.recording,
+              MusicTool.tuner => tuner.listening,
+              MusicTool.keyboard => false,
+            };
 
-    return Material(
-      color: scheme.surface.withValues(alpha: 0.92),
-      borderRadius: const BorderRadius.horizontal(right: Radius.circular(14)),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-        child: Column(
+        if (collapsed) {
+          final any = MusicTool.values.any(active);
+          return PopupMenuButton<MusicTool>(
+            tooltip: tr('음악 도구'),
+            // 켜져 있는 도구가 있으면 접힌 버튼도 선택된 모양으로 둔다.
+            icon: Icon(
+              any ? Icons.music_note : Icons.music_note_outlined,
+              color: any ? scheme.primary : null,
+            ),
+            onSelected: (t) =>
+                openMusicToolWindow(context, t, scoreId: scoreId),
+            itemBuilder: (context) => [
+              for (final t in MusicTool.values)
+                PopupMenuItem(
+                  value: t,
+                  child: Row(
+                    children: [
+                      Icon(
+                        active(t) ? t.activeIcon : t.icon,
+                        size: 22,
+                        color: active(t) ? scheme.primary : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(tr(t.label)),
+                    ],
+                  ),
+                ),
+            ],
+          );
+        }
+
+        return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             for (final t in MusicTool.values)
@@ -153,13 +213,27 @@ class ToolRail extends ConsumerWidget {
                   tooltip: tr(t.label),
                   isSelected: active(t),
                   icon: Icon(t.icon),
+                  selectedIcon: Icon(t.activeIcon),
+                  // 돌고 있는 도구는 색 바탕을 깔아 한눈에 갈리게 한다.
+                  style: ButtonStyle(
+                    backgroundColor: WidgetStateProperty.resolveWith(
+                      (s) => s.contains(WidgetState.selected)
+                          ? scheme.primaryContainer
+                          : null,
+                    ),
+                    foregroundColor: WidgetStateProperty.resolveWith(
+                      (s) => s.contains(WidgetState.selected)
+                          ? scheme.onPrimaryContainer
+                          : null,
+                    ),
+                  ),
                   onPressed: () =>
                       openMusicToolWindow(context, t, scoreId: scoreId),
                 ),
               ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }

@@ -1,15 +1,20 @@
+import 'dart:math' as math;
 import 'dart:io';
 
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:his_score/core/db/database.dart';
 import 'package:his_score/core/db/tables.dart';
+import 'package:his_score/core/layout/page_preview_scope.dart';
 import 'package:his_score/core/storage/app_paths.dart';
 import 'package:his_score/features/viewer/data/score_session.dart';
 import 'package:his_score/features/viewer/domain/spreads.dart';
 import 'package:his_score/features/viewer/domain/viewer_controller.dart';
 import 'package:his_score/features/viewer/presentation/sheets/crop_sheet.dart';
+import 'package:his_score/features/viewer/presentation/viewer_page.dart';
 import 'package:his_score/features/viewer/presentation/widgets/paged_score_view.dart';
 import 'package:his_score/features/viewer/presentation/widgets/score_page_view.dart';
 import 'package:his_score/features/viewer/presentation/widgets/strip_score_view.dart';
@@ -256,9 +261,12 @@ void main() {
       expect(secondAfter.center.dx, lessThan(width / 2));
       expect(tester.getCenter(pageView(3)).dx, greaterThan(width / 2));
 
-      // 두 장은 가운데에서 맞닿는다.
-      expect(secondAfter.right, closeTo(width / 2, 0.5));
-      expect(tester.getRect(pageView(3)).left, closeTo(width / 2, 0.5));
+      // 두 장은 가운데에서 만난다. 사이에는 장을 가르는 틈만 있다.
+      expect(secondAfter.right, closeTo(width / 2 - ScorePageView.gap, 0.5));
+      expect(
+        tester.getRect(pageView(3)).left,
+        closeTo(width / 2 + ScorePageView.gap, 0.5),
+      );
     });
 
     testWidgets('마지막 장까지 갈 수 있다', (tester) async {
@@ -387,6 +395,110 @@ void main() {
     reopened!.dispose();
   });
 
+  testWidgets('슬라이더로 훑는 동안은 거칠게 굽고, 놓으면 제 해상도로 굽는다', (tester) async {
+    // 다른 테스트가 데운 캐시가 섞이지 않게 새 세션을 연다.
+    final fresh = (await tester.runAsync(() => openSession()))!;
+    addTearDown(fresh.dispose);
+    var preview = true;
+    late StateSetter update;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              update = setState;
+              return PagePreviewScope(
+                preview: preview,
+                child: PagedScoreView(
+                  session: fresh,
+                  map: const SpreadMap(
+                    pageCount: 8,
+                    layout: PageLayout.single,
+                    startOnRight: false,
+                  ),
+                  animation: TurnAnimation.slide,
+                  pageIndex: 4,
+                  onPageChanged: (_) {},
+                  scrubbing: preview,
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await settleWithRender(tester);
+
+    List<int> widthsOf(int page) => [
+      for (final k in fresh.caches.first.cachedKeys)
+        if (k.pageNumber == page) k.widthBucket,
+    ];
+
+    // 5쪽을 작게, 한 번만 구웠다.
+    final coarse = widthsOf(5);
+    expect(coarse, hasLength(1));
+
+    update(() => preview = false);
+    await settleWithRender(tester);
+
+    // 손을 놓으면 같은 쪽을 훨씬 크게 다시 굽는다.
+    final full = widthsOf(5).reduce(math.max);
+    expect(full, greaterThan(coarse.single * 2));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('넘기면 지금 쪽 위치를 잠깐 띄운다', (tester) async {
+    // 아래 막대의 음악 도구가 녹음 상태를 보려고 녹음기를 만든다. 테스트에는
+    // 녹음 플러그인이 없으니 그 채널만 조용히 받아 준다.
+    const recordChannel = MethodChannel('com.llfbandit.record/messages');
+    final messenger = TestDefaultBinaryMessengerBinding
+        .instance
+        .defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(recordChannel, (_) async => null);
+    addTearDown(() => messenger.setMockMethodCallHandler(recordChannel, null));
+
+    final db = AppDatabase(NativeDatabase.memory());
+    final fresh = (await tester.runAsync(() => openSession()))!;
+    addTearDown(() async {
+      fresh.dispose();
+      await db.close();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          scoreSessionProvider.overrideWith((ref, key) async => fresh),
+        ],
+        child: const MaterialApp(
+          home: ViewerPage(sessionKey: SessionKey.score('t'), initialPage: 0),
+        ),
+      ),
+    );
+    await settleWithRender(tester);
+
+    // 오른쪽 넘김 영역을 누른다.
+    final size = tester.getSize(find.byType(ViewerPage));
+    await tester.tapAt(Offset(size.width * 0.92, size.height / 2));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 위 막대에도 쪽 번호가 있다. 잠깐 뜨는 알림만 집는다.
+    Finder flash() => find.widgetWithText(AnimatedOpacity, '2 / 8');
+    expect(flash(), findsOneWidget);
+    expect(tester.widget<AnimatedOpacity>(flash()).opacity, 1);
+
+    // 잠깐 뒤에는 거둔다(글자는 남기고 보임만 끈다).
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.widget<AnimatedOpacity>(flash()).opacity, 0);
+
+    // 화면을 내려 타이머를 모두 거둔다.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 1));
+  });
+
   group('여백·기울기 조정', () {
     Future<void> openSheet(WidgetTester tester) async {
       await tester.pumpWidget(
@@ -400,6 +512,7 @@ void main() {
                       context,
                       session: session,
                       current: session.pages.first,
+                      onSaved: () {},
                     ),
                     child: const Text('open'),
                   ),
@@ -496,6 +609,43 @@ void main() {
       );
       c.handle(TurnCommand.next);
       expect(c.state.pageIndex, 2);
+    });
+
+    test('첫 장에서 앞으로, 마지막 장에서 뒤로 넘기면 알려 준다', () {
+      final edges = <TurnEdge>[];
+      final c = ViewerController(const ViewerState(pageCount: 3))
+        ..onEdgeReached = edges.add;
+
+      c.handle(TurnCommand.previous);
+      expect(edges, [TurnEdge.first]);
+
+      c.handle(TurnCommand.last);
+      c.handle(TurnCommand.next);
+      expect(edges, [TurnEdge.first, TurnEdge.last]);
+
+      // 가운데에서는 아무 말도 하지 않는다.
+      c.handle(TurnCommand.first);
+      c.handle(TurnCommand.next);
+      expect(edges.length, 2);
+    });
+
+    test('두 장씩 넘기다 마지막 한 장이 남으면 아직 끝이 아니다', () {
+      final edges = <TurnEdge>[];
+      final c = ViewerController(
+        const ViewerState(
+          pageCount: 5,
+          layout: PageLayout.dual,
+          dualStepOne: false,
+        ),
+      )..onEdgeReached = edges.add;
+
+      c.goToPage(2);
+      c.handle(TurnCommand.next);
+      expect(c.state.pageIndex, 4);
+      expect(edges, isEmpty);
+
+      c.handle(TurnCommand.next);
+      expect(edges, [TurnEdge.last]);
     });
 
     test('끝에서 더 넘겨도 범위를 벗어나지 않는다', () {

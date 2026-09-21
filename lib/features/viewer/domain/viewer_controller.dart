@@ -8,6 +8,9 @@ import '../../../core/db/tables.dart';
 /// 수렴한다. 입력 장치가 늘어도 뷰어는 이 목록만 알면 된다.
 enum TurnCommand { next, previous, first, last }
 
+/// 더 넘길 곳이 없는 자리. 화면이 짧게 알려 준다.
+enum TurnEdge { first, last }
+
 @immutable
 class ViewerState {
   const ViewerState({
@@ -22,6 +25,7 @@ class ViewerState {
     this.autoScrollSeconds = 180,
     this.annotating = false,
     this.editingJumps = false,
+    this.scrubbing = false,
   });
 
   final int pageCount;
@@ -53,6 +57,10 @@ class ViewerState {
   /// 점프 버튼 편집 모드. 빈 곳을 눌러 버튼을 놓는다.
   final bool editingJumps;
 
+  /// 아래 슬라이더를 끌어 페이지를 훑는 중.
+  /// 장마다 넘김을 재생하거나 마지막 자리를 기록하면 손가락을 못 따라온다.
+  final bool scrubbing;
+
   /// 탭 영역을 꺼야 하는 상태.
   bool get overlayEditing => annotating || editingJumps;
 
@@ -80,6 +88,7 @@ class ViewerState {
     double? autoScrollSeconds,
     bool? annotating,
     bool? editingJumps,
+    bool? scrubbing,
   }) {
     return ViewerState(
       pageCount: pageCount ?? this.pageCount,
@@ -93,6 +102,7 @@ class ViewerState {
       autoScrollSeconds: autoScrollSeconds ?? this.autoScrollSeconds,
       annotating: annotating ?? this.annotating,
       editingJumps: editingJumps ?? this.editingJumps,
+      scrubbing: scrubbing ?? this.scrubbing,
     );
   }
 }
@@ -109,6 +119,10 @@ class ViewerController extends ChangeNotifier {
 
   /// 페이지가 바뀐 순간 호출된다. 미리 굽기와 마지막 위치 저장에 쓴다.
   ValueChanged<int>? onPageChanged;
+
+  /// 첫 장에서 더 앞으로, 마지막 장에서 더 뒤로 넘기려 했을 때 호출된다.
+  /// 아무 일도 일어나지 않으면 기기가 고장 난 줄 안다. 한마디 띄워 준다.
+  ValueChanged<TurnEdge>? onEdgeReached;
 
   void _set(ViewerState next) {
     if (identical(next, _state)) return;
@@ -130,9 +144,15 @@ class ViewerController extends ChangeNotifier {
   void handle(TurnCommand command) {
     switch (command) {
       case TurnCommand.next:
-        goToPage(_state.pageIndex + _state.spreadStep);
+        // 한 칸도 못 움직였으면 끝에 닿은 것이다. 두 장씩 넘기다 마지막
+        // 한 장이 남았을 때처럼 조금이라도 움직였으면 끝이 아니다.
+        if (!goToPage(_state.pageIndex + _state.spreadStep)) {
+          reportEdge(TurnEdge.last);
+        }
       case TurnCommand.previous:
-        goToPage(_state.pageIndex - _state.spreadStep);
+        if (!goToPage(_state.pageIndex - _state.spreadStep)) {
+          reportEdge(TurnEdge.first);
+        }
       case TurnCommand.first:
         goToPage(0);
       case TurnCommand.last:
@@ -140,11 +160,19 @@ class ViewerController extends ChangeNotifier {
     }
   }
 
-  void goToPage(int index) {
+  /// 화면 쪽에서 손가락으로 끝까지 밀었을 때도 같은 말을 띄우도록 열어 둔다.
+  void reportEdge(TurnEdge edge) {
     if (_state.pageCount == 0) return;
+    onEdgeReached?.call(edge);
+  }
+
+  /// 페이지가 실제로 움직였으면 참.
+  bool goToPage(int index) {
+    if (_state.pageCount == 0) return false;
     final clamped = index.clamp(0, _state.pageCount - 1);
-    if (clamped == _state.pageIndex) return;
+    if (clamped == _state.pageIndex) return false;
     _set(_state.copyWith(pageIndex: clamped));
+    return true;
   }
 
   /// 세션을 다시 열어 페이지 수가 달라졌을 때 맞춰 준다.
@@ -189,6 +217,12 @@ class ViewerController extends ChangeNotifier {
 
   void setDualStepOne(bool value) =>
       _set(_state.copyWith(dualStepOne: value));
+
+  /// 슬라이더를 잡았다 놓을 때. 놓는 순간의 자리는 화면 쪽이 마무리한다.
+  void setScrubbing(bool value) {
+    if (value == _state.scrubbing) return;
+    _set(_state.copyWith(scrubbing: value));
+  }
 
   void setPerformanceMode(bool value) =>
       _set(_state.copyWith(performanceMode: value));

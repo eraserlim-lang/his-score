@@ -103,7 +103,7 @@ class SetlistPage extends ConsumerWidget {
                       PopupMenuItem(
                         value: 'play',
                         enabled: entry.itemCount > 0,
-                        child: Text(tr('연주하기')),
+                        child: Text(tr('세트리스트 보기')),
                       ),
                       PopupMenuItem(value: 'share', child: Text(tr('공유'))),
                       PopupMenuItem(value: 'duplicate', child: Text(tr('복제'))),

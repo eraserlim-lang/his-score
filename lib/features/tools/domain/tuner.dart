@@ -157,8 +157,19 @@ class TunerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// dispose 에 들어온 뒤로는 알리지 않는다. 멈추면서 알리면 이미 떠난
+  /// 듣는 쪽을 부르게 되고, 멈추기가 비동기라 dispose 가 끝난 뒤에도 알림이
+  /// 늦게 도착한다.
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     stop();
     stopPipe();
     _recorder.dispose();
@@ -168,6 +179,6 @@ class TunerController extends ChangeNotifier {
 
 final tunerProvider = ChangeNotifierProvider<TunerController>((ref) {
   final c = TunerController();
-  ref.onDispose(c.dispose);
+  // ChangeNotifierProvider 가 알아서 dispose 한다. 여기서 또 부르면 두 번이다.
   return c;
 });

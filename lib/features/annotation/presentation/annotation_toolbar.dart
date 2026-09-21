@@ -261,10 +261,14 @@ class AnnotationToolbar extends StatelessWidget {
       // 목록이 안에서 스스로 스크롤한다.
       fill: true,
       scrollable: false,
-      child: Builder(
-        builder: (sheetContext) => StampPalette(
+      // 상자 두르기를 바꾸면 미리보기가 곧바로 따라 바뀌어야 한다.
+      child: ListenableBuilder(
+        listenable: tools,
+        builder: (sheetContext, _) => StampPalette(
           selected: tools.stampId,
           color: tools.color,
+          boxed: tools.stampBoxed,
+          onBoxedChanged: tools.setStampBoxed,
           onSelected: (id) {
             tools.setStamp(id);
             Navigator.pop(sheetContext);
@@ -595,17 +599,32 @@ class StampPalette extends StatelessWidget {
     required this.selected,
     required this.color,
     required this.onSelected,
+    this.boxed = false,
+    this.onBoxedChanged,
   });
 
   final String selected;
   final Color color;
   final ValueChanged<String> onSelected;
 
+  /// 새로 찍을 스탬프를 네모 상자로 두르는지. 미리보기도 그 모양으로 그린다.
+  final bool boxed;
+  final ValueChanged<bool>? onBoxedChanged;
+
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
+        if (onBoxedChanged != null)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: const Icon(Icons.crop_square),
+            title: Text(tr('상자 두르기')),
+            subtitle: Text(tr('새로 찍는 스탬프를 네모로 두릅니다')),
+            value: boxed,
+            onChanged: onBoxedChanged,
+          ),
         for (final group in stampGroups) ...[
           Padding(
             padding: const EdgeInsets.only(top: 12, bottom: 6),
@@ -637,7 +656,7 @@ class StampPalette extends StatelessWidget {
                         ),
                       ),
                       child: CustomPaint(
-                        painter: _StampPreview(stamp.id, color),
+                        painter: _StampPreview(stamp.id, color, boxed),
                       ),
                     ),
                   ),
@@ -651,9 +670,10 @@ class StampPalette extends StatelessWidget {
 }
 
 class _StampPreview extends CustomPainter {
-  _StampPreview(this.id, this.color);
+  _StampPreview(this.id, this.color, this.boxed);
   final String id;
   final Color color;
+  final bool boxed;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -666,7 +686,8 @@ class _StampPreview extends CustomPainter {
         x: 0.5,
         y: 0.5,
         color: color,
-        fontSize: 26,
+        fontSize: boxed ? 22 : 26,
+        boxed: boxed,
       ),
       InkTransform(
         size: size,
@@ -674,10 +695,12 @@ class _StampPreview extends CustomPainter {
         scaleOverride: 1,
       ),
       // 칸 밖으로 삐져나오지 않게 글자를 줄인다. 양옆에 숨 쉴 자리를 둔다.
-      maxWidth: size.width - 8,
+      // 상자를 두르면 상자 몫만큼 더 줄인다.
+      maxWidth: size.width - (boxed ? 20 : 8),
     );
   }
 
   @override
-  bool shouldRepaint(_StampPreview old) => old.id != id || old.color != color;
+  bool shouldRepaint(_StampPreview old) =>
+      old.id != id || old.color != color || old.boxed != boxed;
 }

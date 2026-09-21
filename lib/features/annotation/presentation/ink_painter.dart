@@ -288,6 +288,7 @@ class InkPainter extends CustomPainter {
       } else {
         bounds = StampPainter.paint(canvas, def.id, center, base, item.color);
       }
+      if (item.boxed) bounds = _paintBox(canvas, bounds, base, item.color);
     }
 
     if (selected) {
@@ -299,6 +300,29 @@ class InkPainter extends CustomPainter {
           ..color = Colors.blueAccent,
       );
     }
+  }
+
+  /// 스탬프 둘레에 네모를 두른다. 인쇄 악보의 리허설 마크 모양이다.
+  ///
+  /// 한 글자면 정사각형으로 맞추고, 높이는 글자 크기로만 정한다. 'A' 와
+  /// 'Chorus' 를 나란히 찍어도 상자 높이가 같아 가지런하다.
+  static Rect _paintBox(Canvas canvas, Rect inner, double size, Color color) {
+    final pad = size * 0.16;
+    final height = inner.height + pad * 2;
+    final width = math.max(inner.width + pad * 2, height);
+    final box = Rect.fromCenter(
+      center: inner.center,
+      width: width,
+      height: height,
+    );
+    canvas.drawRect(
+      box,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1.0, size * 0.07)
+        ..color = color,
+    );
+    return box;
   }
 
   static Rect _paintText(

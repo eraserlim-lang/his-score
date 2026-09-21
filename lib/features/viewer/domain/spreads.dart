@@ -1,5 +1,8 @@
 import '../../../core/db/tables.dart';
 
+/// 짝이 없는 한 장이 설 자리.
+enum PageSlot { center, left, right }
+
 /// 한 번에 화면에 들어가는 페이지 묶음과 페이지 번호 사이의 변환.
 ///
 /// 1페이지 보기는 묶음 하나에 한 장, 2페이지 보기는 두 장이다.
@@ -63,6 +66,17 @@ class SpreadMap {
       if (left < pageCount) left,
       if (left + 1 < pageCount) left + 1,
     ];
+  }
+
+  /// 짝이 없는 한 장을 화면의 어디에 세울지.
+  ///
+  /// 2페이지 보기는 펼침면이라 짝 없는 장도 제자리를 지켜야 한다.
+  /// 첫 장을 오른쪽에 두면 그 장은 오른쪽 반에, 끝에 남은 장은 왼쪽 반에
+  /// 선다. 가운데로 끌어오면 다음 장부터 자리가 통째로 어긋나 보인다.
+  PageSlot slotOf(int spread) {
+    if (!_isDual || pagesOf(spread).length != 1) return PageSlot.center;
+    if (startOnRight && !stepOne && spread == 0) return PageSlot.right;
+    return PageSlot.left;
   }
 
   /// 페이지가 속한 묶음 번호.

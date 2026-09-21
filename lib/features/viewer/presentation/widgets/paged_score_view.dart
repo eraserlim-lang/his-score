@@ -9,6 +9,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../data/page_render_cache.dart';
 import '../../data/score_session.dart';
 import '../../domain/spreads.dart';
+import '../../domain/viewer_controller.dart' show TurnEdge;
 import 'page_curl.dart';
 import 'score_page_view.dart';
 
@@ -32,7 +33,9 @@ class PagedScoreView extends StatefulWidget {
     required this.pageIndex,
     required this.onPageChanged,
     this.overlayBuilder,
+    this.onEdge,
     this.panEnabled = true,
+    this.scrubbing = false,
   });
 
   final ScoreSession session;
@@ -42,9 +45,15 @@ class PagedScoreView extends StatefulWidget {
   final ValueChanged<int> onPageChanged;
   final PageOverlayBuilder? overlayBuilder;
 
+  /// 끝에 닿은 채로 더 밀었을 때. 화면이 짧게 알려 준다.
+  final ValueChanged<TurnEdge>? onEdge;
+
   /// 확대한 화면을 한 손가락으로 끌어 옮길 수 있는지.
   /// 필기 중에는 한 손가락이 펜이므로 꺼 둔다.
   final bool panEnabled;
+
+  /// 아래 슬라이더를 끌어 페이지를 훑는 중. 넘김을 재생하지 않고 바로 건너뛴다.
+  final bool scrubbing;
 
   @override
   State<PagedScoreView> createState() => PagedScoreViewState();
@@ -83,13 +92,9 @@ class PagedScoreViewState extends State<PagedScoreView>
   Offset? _latestDrag;
 
   /// 손을 뗀 뒤 끝까지 넘어가거나 제자리로 돌아가는 움직임.
-  late final AnimationController _settle =
-      AnimationController(
-          vsync: this,
-          duration: const Duration(milliseconds: 320),
-        )
-        ..addListener(_onSettleTick)
-        ..addStatusListener(_onSettleStatus);
+  /// 늦게 만들면 한 번도 넘기지 않고 닫을 때 dispose 안에서 태어난다.
+  /// 그때는 위젯이 이미 떨어져 나가 vsync 를 찾지 못하므로 미리 만들어 둔다.
+  late final AnimationController _settle;
   Offset? _settleFrom;
   Offset? _settleTo;
   bool _settleCommit = false;
@@ -111,6 +116,12 @@ class PagedScoreViewState extends State<PagedScoreView>
   @override
   void initState() {
     super.initState();
+    _settle = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    )
+      ..addListener(_onSettleTick)
+      ..addStatusListener(_onSettleStatus);
     _spread = widget.map.spreadOf(widget.pageIndex);
     _sliding = _slidingFor(widget.map);
     _curl = _curlFor(widget.map);
@@ -141,6 +152,13 @@ class PagedScoreViewState extends State<PagedScoreView>
     if (_curl) {
       // PageView 가 없으니 넘김도 여기서 직접 재생한다.
       if (target == _spread) return;
+      if (widget.scrubbing) {
+        // 훑는 중에는 장마다 종이를 접지 않는다. 넘김이 끝나기를 기다리는
+        // 동안 들어온 자리를 버리게 되어 손가락을 따라오다 멈춰 버린다.
+        _cancelTurn();
+        _spread = target;
+        return;
+      }
       if (_turn != null || _preparing) {
         // 넘기는 도중 바깥에서 쪽이 바뀌면(탭 영역·페달) 손에 든 장을 놓지
         // 않는다. 끊으면 장이 사라지고 그냥 점프한다. 끝난 뒤 _reconcile 이 맞춘다.
@@ -154,7 +172,10 @@ class PagedScoreViewState extends State<PagedScoreView>
       _spread = target;
       _resetZoom();
       // 멀리 건너뛸 때 중간 페이지를 전부 스쳐 지나가면 느리다.
-      if (((_controller.page ?? 0).round() - target).abs() > 1) {
+      // 훑는 중에도 마찬가지다. 한 칸짜리 애니메이션이 줄줄이 밀리면
+      // 손가락은 벌써 저만치 가 있는데 화면만 뒤따라 기어간다.
+      if (widget.scrubbing ||
+          ((_controller.page ?? 0).round() - target).abs() > 1) {
         _controller.jumpToPage(target);
       } else {
         _controller.animateToPage(
@@ -210,9 +231,18 @@ class PagedScoreViewState extends State<PagedScoreView>
       onZoomChanged: _handleZoomChanged,
       child: _curl
           ? _buildCurl()
-          : _sliding
-          ? _buildStrip(physics)
-          : _buildSpreads(physics),
+          : NotificationListener<OverscrollNotification>(
+              // 끝에서 더 밀면 화면은 꿈쩍도 않는다. 손가락에게 이유를 알려 준다.
+              onNotification: (n) {
+                if (n.overscroll != 0) {
+                  widget.onEdge?.call(
+                    n.overscroll > 0 ? TurnEdge.last : TurnEdge.first,
+                  );
+                }
+                return false;
+              },
+              child: _sliding ? _buildStrip(physics) : _buildSpreads(physics),
+            ),
     );
   }
 
@@ -251,6 +281,7 @@ class PagedScoreViewState extends State<PagedScoreView>
         child: _Spread(
           session: widget.session,
           pages: pages,
+          slot: map.slotOf(index),
           overlayBuilder: widget.overlayBuilder,
           pageKeys: [for (var i = 0; i < pages.length; i++) _keyFor(index, i)],
         ),
@@ -340,8 +371,14 @@ class PagedScoreViewState extends State<PagedScoreView>
     if (dx.abs() < 6) return;
     _dragDecided = true;
     final dir = dx < 0 ? _TurnDir.forward : _TurnDir.backward;
-    if (dir == _TurnDir.forward && !_hasNext) return;
-    if (dir == _TurnDir.backward && !_hasPrev) return;
+    if (dir == _TurnDir.forward && !_hasNext) {
+      widget.onEdge?.call(TurnEdge.last);
+      return;
+    }
+    if (dir == _TurnDir.backward && !_hasPrev) {
+      widget.onEdge?.call(TurnEdge.first);
+      return;
+    }
     _beginTurn(dir, at: d.localPosition);
   }
 
@@ -620,6 +657,7 @@ class PagedScoreViewState extends State<PagedScoreView>
         final content = _Spread(
           session: widget.session,
           pages: widget.map.pagesOf(spread),
+          slot: widget.map.slotOf(spread),
           overlayBuilder: widget.overlayBuilder,
         );
 
@@ -641,6 +679,13 @@ class PagedScoreViewState extends State<PagedScoreView>
   /// 만든 것이라 이어진 띠와 맞지 않는다. 넘기기는 _buildCurl 이 맡는다.
   Widget _buildStrip(ScrollPhysics physics) {
     final pageCount = widget.map.pageCount;
+    // 첫 장을 오른쪽에 두면 맨 앞에 빈 칸을 하나 깐다. 그러면 지금 쪽이 늘
+    // 오른쪽 자리에 서고 왼쪽에는 방금 지나온 장이 남아, 책을 넘길 때와
+    // 같은 자리에 눈이 머문다. 아니면 지금 쪽이 왼쪽, 다음 쪽이 오른쪽이다.
+    //
+    // 칸 수는 어느 쪽이든 pageCount + 1 이다. 빈 칸이 앞에 서면 마지막 장이
+    // 오른쪽 끝에 닿고, 뒤에 서면 마지막 장이 왼쪽 자리까지 올라온다.
+    final lead = widget.map.startOnRight ? 1 : 0;
     return PageView.builder(
       key: const ValueKey('strip'),
       scrollBehavior: ScrollConfiguration.of(
@@ -648,12 +693,12 @@ class PagedScoreViewState extends State<PagedScoreView>
       ).copyWith(dragDevices: _fingerDevices),
       controller: _controller,
       padEnds: false,
-      // 마지막 장이 왼쪽 자리까지 올 수 있게 빈 칸을 하나 덧붙인다.
       itemCount: pageCount + 1,
       onPageChanged: _handlePageChanged,
       physics: physics,
       itemBuilder: (context, index) {
-        if (index >= pageCount) return const SizedBox.shrink();
+        final page = index - lead;
+        if (page < 0 || page >= pageCount) return const SizedBox.shrink();
 
         return AnimatedBuilder(
           animation: _controller,
@@ -663,10 +708,13 @@ class PagedScoreViewState extends State<PagedScoreView>
             final slot = (index - _position).clamp(0.0, 1.0);
             return Align(alignment: Alignment(1 - 2 * slot, 0), child: child);
           },
-          child: ScorePageView(
-            session: widget.session,
-            page: widget.session.pages[index],
-            overlayBuilder: widget.overlayBuilder,
+          child: Padding(
+            padding: const EdgeInsets.all(ScorePageView.gap),
+            child: ScorePageView(
+              session: widget.session,
+              page: widget.session.pages[page],
+              overlayBuilder: widget.overlayBuilder,
+            ),
           ),
         );
       },
@@ -818,12 +866,17 @@ class _Spread extends StatelessWidget {
   const _Spread({
     required this.session,
     required this.pages,
+    this.slot = PageSlot.center,
     this.overlayBuilder,
     this.pageKeys,
   });
 
   final ScoreSession session;
   final List<int> pages;
+
+  /// 장이 하나뿐일 때 어느 쪽 반에 세울지.
+  final PageSlot slot;
+
   final PageOverlayBuilder? overlayBuilder;
 
   /// 주어지면 장마다 꼭 맞는 RepaintBoundary 를 두른다. 종이 넘김이
@@ -837,14 +890,29 @@ class _Spread extends StatelessWidget {
       overlayBuilder: overlayBuilder,
     );
     final key = pageKeys?[slot];
-    return key == null ? view : RepaintBoundary(key: key, child: view);
+    final boxed = key == null ? view : RepaintBoundary(key: key, child: view);
+    // 종이 사이와 화면 가장자리에 틈을 둔다. 여백은 경계 바깥이라 종이 넘김이
+    // 재는 자리와 접히는 장에는 들어가지 않는다.
+    return Padding(
+      padding: const EdgeInsets.all(ScorePageView.gap),
+      child: boxed,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     if (pages.isEmpty) return const SizedBox.shrink();
 
-    if (pages.length == 1) return Center(child: _page(0));
+    if (pages.length == 1) {
+      if (slot == PageSlot.center) return Center(child: _page(0));
+      // 반쪽을 비워 두고 제자리에 세운다. 빈 쪽이 펼침면의 맞은편이다.
+      final page = Expanded(child: Center(child: _page(0)));
+      return Row(
+        children: slot == PageSlot.right
+            ? [const Expanded(child: SizedBox.shrink()), page]
+            : [page, const Expanded(child: SizedBox.shrink())],
+      );
+    }
 
     // 두 장에 꼭 맞게 줄어들어야 경계가 여백을 품지 않는다.
     return Center(

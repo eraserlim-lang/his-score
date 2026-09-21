@@ -50,6 +50,10 @@ class PageRenderCache {
   final _tokens = <PageRenderKey, PdfPageRenderCancellationToken>{};
   bool _disposed = false;
 
+  /// 지금 들고 있는 이미지의 키. 테스트가 무엇을 구웠는지 본다.
+  @visibleForTesting
+  Iterable<PageRenderKey> get cachedKeys => _cache.keys;
+
   /// 이미 구워진 이미지가 있으면 즉시 준다. 없으면 null.
   ui.Image? peek(PageRenderKey key) {
     final image = _cache.remove(key);
@@ -134,6 +138,13 @@ class PageRenderCache {
       _cache.remove(oldest)?.dispose();
     }
   }
+
+  /// 아직 굽는 중인 요청을 거둔다.
+  ///
+  /// 굽는 일꾼은 하나라 요청이 줄을 선다. 줄에 선 채면 건너뛰고, 이미 굽고
+  /// 있으면 끝까지 굽는다(pdfium 은 도중에 멈추지 못한다). 같은 요청을
+  /// 기다리던 쪽은 null 을 받는다. 훑는 동안 스쳐 간 쪽에 쓴다.
+  void cancel(PageRenderKey key) => _tokens.remove(key)?.cancel();
 
   /// 현재 페이지 주변을 미리 굽는다. 결과는 기다리지 않는다.
   ///

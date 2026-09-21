@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/db/tables.dart';
+import '../../../core/layout/page_preview_scope.dart';
 import '../data/annotation_dao.dart';
 import '../data/page_ink_store.dart';
 import '../domain/annotation_tool_state.dart';
@@ -128,6 +129,8 @@ class _InkLayerState extends State<InkLayer> {
             y: n.dy,
             color: tools.color,
             fontSize: 28 * tools.width,
+            // 스탬프마다 기억한다. 나중에 옵션을 바꿔도 찍어 둔 것은 그대로다.
+            boxed: tools.stampBoxed,
           ),
         );
         _activePointer = null;
@@ -190,6 +193,41 @@ class _InkLayerState extends State<InkLayer> {
   }
 
   PlacedAnnotation? _previewPlaced;
+
+  /// 쫓던 손가락을 인식기와 함께 잃었다. 누르고 있다는 표시를 거둔다.
+  ///
+  /// 그리던 도중에 쪽이 넘어가 이 층이 내려갈 때 불린다. 위젯 나무를
+  /// 정리하는 도중이라 여기서 바로 고치면 다시 그리기를 청하게 되어 막힌다.
+  /// 표시만 지금 거두고, 그리던 것은 다음 틀에서 떼었을 때처럼 마무리한다.
+  void _lost(int pointer) {
+    if (pointer != _activePointer) return;
+    _activePointer = null;
+
+    final controller = widget.controller;
+    final live = _live;
+    final erased = _eraserCursor == null
+        ? null
+        : (_erasedOriginal.values.toList(), _erasedResult);
+    final moved = _previewPlaced != null && _dragOriginal != null
+        ? (_dragOriginal!, _previewPlaced!)
+        : null;
+
+    _live = null;
+    _eraserCursor = null;
+    _erasedOriginal.clear();
+    _erasedResult = [];
+    _previewPlaced = null;
+    _dragOriginal = null;
+    _dragStart = null;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (live != null && (live.isShape || live.points.isNotEmpty)) {
+        controller.addStroke(live);
+      }
+      if (erased != null) controller.erase(erased.$1, erased.$2);
+      if (moved != null) controller.updatePlaced(moved.$1, moved.$2);
+    });
+  }
 
   void _up(PointerEvent e) {
     if (e.pointer != _activePointer) return;
@@ -343,6 +381,7 @@ class _InkLayerState extends State<InkLayer> {
 
   @override
   Widget build(BuildContext context) {
+    final preview = PagePreviewScope.of(context);
     return ListenableBuilder(
       listenable: Listenable.merge([widget.controller, widget.tools]),
       builder: (context, _) {
@@ -372,7 +411,13 @@ class _InkLayerState extends State<InkLayer> {
               size: size,
             );
 
-            final pencil = _usePencilKit
+            // PencilKit 캔버스는 네이티브 뷰다. 쪽마다 띄우면 넘길 때마다 새로
+            // 만들고 부숴 iOS 에서 넘김이 끊기고, 화면에 떠 있는 것만으로도
+            // 프레임마다 합성 비용이 붙는다. 쓰는 중이거나 펜 획이 있는 쪽에만
+            // 띄운다. 훑는 동안에는 펜 획도 잠시 접어 둔다.
+            final hasPen = ink.pencilKitData?.isNotEmpty ?? false;
+            final pencil =
+                _usePencilKit && (widget.editing || (hasPen && !preview))
                 ? PencilKitCanvas(
                     controller: widget.controller,
                     tools: widget.tools,
@@ -418,12 +463,14 @@ class _InkLayerState extends State<InkLayer> {
                         onDown: (e) => _down(e, size),
                         onMove: (e) => _move(e, size),
                         onUp: _up,
+                        onLost: _lost,
                       ),
                       (r) {
                         r.accepts = _accepts;
                         r.onDown = (e) => _down(e, size);
                         r.onMove = (e) => _move(e, size);
                         r.onUp = _up;
+                        r.onLost = _lost;
                       },
                     ),
               },
@@ -435,14 +482,19 @@ class _InkLayerState extends State<InkLayer> {
             // 손가락이 인식기에도 닿아 _down 이 "빈 곳을 눌렀다" 로 보고 선택을
             // 풀어 버린다. 단추가 사라진 뒤에 눌림이 도착하니 아무 일도 안 났다.
             // Stack 은 위에 있는 자식부터 맞히므로 단추가 먼저 받는다.
-            if (_selectedId == null || widget.tools.tool != InkTool.select) {
-              return gestures;
-            }
+            //
+            // 단추가 없을 때도 같은 Stack 을 쓴다. 고를 때마다 인식기를 Stack
+            // 안팎으로 옮기면 인식기가 새로 만들어지는데, 그때 누르고 있던
+            // 손가락의 "뗌" 이 버려진 옛 인식기로 가 버린다. 그러면 누르고 있다는
+            // 표시가 영영 남아 그 뒤로는 찍기도 고르기도 먹지 않았다.
+            final showActions =
+                _selectedId != null && widget.tools.tool == InkTool.select;
             return Stack(
               fit: StackFit.expand,
               children: [
                 gestures,
-                Positioned(
+                if (showActions)
+                  Positioned(
                   right: 8,
                   top: 8,
                   child: Row(
@@ -481,6 +533,7 @@ class _InkRecognizer extends OneSequenceGestureRecognizer {
     required this.onDown,
     required this.onMove,
     required this.onUp,
+    required this.onLost,
   });
 
   bool Function(PointerEvent) accepts;
@@ -488,9 +541,15 @@ class _InkRecognizer extends OneSequenceGestureRecognizer {
   void Function(PointerMoveEvent) onMove;
   void Function(PointerEvent) onUp;
 
+  /// 손가락을 쫓던 중에 버려졌을 때. "뗌" 이 오지 않으니 대신 알린다.
+  void Function(int pointer) onLost;
+
+  final _tracking = <int>{};
+
   @override
   void addAllowedPointer(PointerDownEvent event) {
     if (!accepts(event)) return;
+    _tracking.add(event.pointer);
     startTrackingPointer(event.pointer, event.transform);
     resolve(GestureDisposition.accepted);
     onDown(event);
@@ -501,9 +560,19 @@ class _InkRecognizer extends OneSequenceGestureRecognizer {
     if (event is PointerMoveEvent) {
       onMove(event);
     } else if (event is PointerUpEvent || event is PointerCancelEvent) {
+      _tracking.remove(event.pointer);
       onUp(event);
       stopTrackingPointer(event.pointer);
     }
+  }
+
+  @override
+  void dispose() {
+    for (final pointer in _tracking) {
+      onLost(pointer);
+    }
+    _tracking.clear();
+    super.dispose();
   }
 
   @override

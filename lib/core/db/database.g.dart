@@ -5008,6 +5008,18 @@ class $AnnotationsTable extends Annotations
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _boxedMeta = const VerificationMeta('boxed');
+  @override
+  late final GeneratedColumn<bool> boxed = GeneratedColumn<bool>(
+    'boxed',
+    aliasedName,
+    true,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("boxed" IN (0, 1))',
+    ),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -5022,6 +5034,7 @@ class $AnnotationsTable extends Annotations
     color,
     fontSize,
     sortOrder,
+    boxed,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5112,6 +5125,12 @@ class $AnnotationsTable extends Annotations
         sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
       );
     }
+    if (data.containsKey('boxed')) {
+      context.handle(
+        _boxedMeta,
+        boxed.isAcceptableOrUnknown(data['boxed']!, _boxedMeta),
+      );
+    }
     return context;
   }
 
@@ -5169,6 +5188,10 @@ class $AnnotationsTable extends Annotations
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
       )!,
+      boxed: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}boxed'],
+      ),
     );
   }
 
@@ -5195,6 +5218,11 @@ class Annotation extends DataClass implements Insertable<Annotation> {
   final int color;
   final double? fontSize;
   final int sortOrder;
+
+  /// 스탬프를 네모 상자로 두르는지. 송폼 표시(Intro, A 파트)는 인쇄 악보에서도
+  /// 상자로 두른 리허설 마크로 쓴다. null 이면 두르지 않는다. 옛 백업에는 이
+  /// 칸이 없어 비워 둘 수 있어야 한다.
+  final bool? boxed;
   const Annotation({
     required this.id,
     required this.scoreId,
@@ -5208,6 +5236,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     required this.color,
     this.fontSize,
     required this.sortOrder,
+    this.boxed,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5226,6 +5255,9 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       map['font_size'] = Variable<double>(fontSize);
     }
     map['sort_order'] = Variable<int>(sortOrder);
+    if (!nullToAbsent || boxed != null) {
+      map['boxed'] = Variable<bool>(boxed);
+    }
     return map;
   }
 
@@ -5245,6 +5277,9 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           ? const Value.absent()
           : Value(fontSize),
       sortOrder: Value(sortOrder),
+      boxed: boxed == null && nullToAbsent
+          ? const Value.absent()
+          : Value(boxed),
     );
   }
 
@@ -5266,6 +5301,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       color: serializer.fromJson<int>(json['color']),
       fontSize: serializer.fromJson<double?>(json['fontSize']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      boxed: serializer.fromJson<bool?>(json['boxed']),
     );
   }
   @override
@@ -5284,6 +5320,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       'color': serializer.toJson<int>(color),
       'fontSize': serializer.toJson<double?>(fontSize),
       'sortOrder': serializer.toJson<int>(sortOrder),
+      'boxed': serializer.toJson<bool?>(boxed),
     };
   }
 
@@ -5300,6 +5337,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     int? color,
     Value<double?> fontSize = const Value.absent(),
     int? sortOrder,
+    Value<bool?> boxed = const Value.absent(),
   }) => Annotation(
     id: id ?? this.id,
     scoreId: scoreId ?? this.scoreId,
@@ -5313,6 +5351,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     color: color ?? this.color,
     fontSize: fontSize.present ? fontSize.value : this.fontSize,
     sortOrder: sortOrder ?? this.sortOrder,
+    boxed: boxed.present ? boxed.value : this.boxed,
   );
   Annotation copyWithCompanion(AnnotationsCompanion data) {
     return Annotation(
@@ -5328,6 +5367,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       color: data.color.present ? data.color.value : this.color,
       fontSize: data.fontSize.present ? data.fontSize.value : this.fontSize,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      boxed: data.boxed.present ? data.boxed.value : this.boxed,
     );
   }
 
@@ -5345,7 +5385,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           ..write('rotation: $rotation, ')
           ..write('color: $color, ')
           ..write('fontSize: $fontSize, ')
-          ..write('sortOrder: $sortOrder')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('boxed: $boxed')
           ..write(')'))
         .toString();
   }
@@ -5364,6 +5405,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     color,
     fontSize,
     sortOrder,
+    boxed,
   );
   @override
   bool operator ==(Object other) =>
@@ -5380,7 +5422,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           other.rotation == this.rotation &&
           other.color == this.color &&
           other.fontSize == this.fontSize &&
-          other.sortOrder == this.sortOrder);
+          other.sortOrder == this.sortOrder &&
+          other.boxed == this.boxed);
 }
 
 class AnnotationsCompanion extends UpdateCompanion<Annotation> {
@@ -5396,6 +5439,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
   final Value<int> color;
   final Value<double?> fontSize;
   final Value<int> sortOrder;
+  final Value<bool?> boxed;
   final Value<int> rowid;
   const AnnotationsCompanion({
     this.id = const Value.absent(),
@@ -5410,6 +5454,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     this.color = const Value.absent(),
     this.fontSize = const Value.absent(),
     this.sortOrder = const Value.absent(),
+    this.boxed = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AnnotationsCompanion.insert({
@@ -5425,6 +5470,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     this.color = const Value.absent(),
     this.fontSize = const Value.absent(),
     this.sortOrder = const Value.absent(),
+    this.boxed = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        scoreId = Value(scoreId),
@@ -5446,6 +5492,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     Expression<int>? color,
     Expression<double>? fontSize,
     Expression<int>? sortOrder,
+    Expression<bool>? boxed,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5461,6 +5508,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
       if (color != null) 'color': color,
       if (fontSize != null) 'font_size': fontSize,
       if (sortOrder != null) 'sort_order': sortOrder,
+      if (boxed != null) 'boxed': boxed,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5478,6 +5526,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     Value<int>? color,
     Value<double?>? fontSize,
     Value<int>? sortOrder,
+    Value<bool?>? boxed,
     Value<int>? rowid,
   }) {
     return AnnotationsCompanion(
@@ -5493,6 +5542,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
       color: color ?? this.color,
       fontSize: fontSize ?? this.fontSize,
       sortOrder: sortOrder ?? this.sortOrder,
+      boxed: boxed ?? this.boxed,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5536,6 +5586,9 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
+    if (boxed.present) {
+      map['boxed'] = Variable<bool>(boxed.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5557,6 +5610,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
           ..write('color: $color, ')
           ..write('fontSize: $fontSize, ')
           ..write('sortOrder: $sortOrder, ')
+          ..write('boxed: $boxed, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10463,6 +10517,7 @@ typedef $$AnnotationsTableCreateCompanionBuilder =
       Value<int> color,
       Value<double?> fontSize,
       Value<int> sortOrder,
+      Value<bool?> boxed,
       Value<int> rowid,
     });
 typedef $$AnnotationsTableUpdateCompanionBuilder =
@@ -10479,6 +10534,7 @@ typedef $$AnnotationsTableUpdateCompanionBuilder =
       Value<int> color,
       Value<double?> fontSize,
       Value<int> sortOrder,
+      Value<bool?> boxed,
       Value<int> rowid,
     });
 
@@ -10565,6 +10621,11 @@ class $$AnnotationsTableFilterComposer
 
   ColumnFilters<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get boxed => $composableBuilder(
+    column: $table.boxed,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10656,6 +10717,11 @@ class $$AnnotationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get boxed => $composableBuilder(
+    column: $table.boxed,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ScoresTableOrderingComposer get scoreId {
     final $$ScoresTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -10722,6 +10788,9 @@ class $$AnnotationsTableAnnotationComposer
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
+  GeneratedColumn<bool> get boxed =>
+      $composableBuilder(column: $table.boxed, builder: (column) => column);
+
   $$ScoresTableAnnotationComposer get scoreId {
     final $$ScoresTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -10786,6 +10855,7 @@ class $$AnnotationsTableTableManager
                 Value<int> color = const Value.absent(),
                 Value<double?> fontSize = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
+                Value<bool?> boxed = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion(
                 id: id,
@@ -10800,6 +10870,7 @@ class $$AnnotationsTableTableManager
                 color: color,
                 fontSize: fontSize,
                 sortOrder: sortOrder,
+                boxed: boxed,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -10816,6 +10887,7 @@ class $$AnnotationsTableTableManager
                 Value<int> color = const Value.absent(),
                 Value<double?> fontSize = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
+                Value<bool?> boxed = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion.insert(
                 id: id,
@@ -10830,6 +10902,7 @@ class $$AnnotationsTableTableManager
                 color: color,
                 fontSize: fontSize,
                 sortOrder: sortOrder,
+                boxed: boxed,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

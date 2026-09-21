@@ -68,6 +68,7 @@ class AnnotationDao extends DatabaseAccessor<AppDatabase>
             rotation: row.rotation,
             fontSize: row.fontSize,
             sortOrder: row.sortOrder,
+            boxed: row.boxed ?? false,
           ),
       ],
       pencilKitData: pencilKit,
@@ -147,6 +148,7 @@ class AnnotationDao extends DatabaseAccessor<AppDatabase>
           color: Value(a.color.toARGB32()),
           fontSize: Value(a.fontSize),
           sortOrder: Value(a.sortOrder),
+          boxed: Value(a.boxed),
         ),
       );
 

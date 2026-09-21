@@ -7,7 +7,6 @@ import 'package:his_score/core/db/score_dao.dart';
 import 'package:his_score/core/db/settings_dao.dart';
 import 'package:his_score/core/storage/app_paths.dart';
 import 'package:his_score/features/importer/data/image_to_pdf.dart';
-import 'package:his_score/features/importer/data/imslp_client.dart';
 import 'package:his_score/features/importer/data/score_importer.dart';
 import 'package:his_score/features/importer/data/watch_folder_service.dart';
 import 'package:his_score/features/library/data/cover_generator.dart';
@@ -56,33 +55,6 @@ void main() {
       // 첫 장은 가로, 둘째 장은 90° 돌아 세로여야 한다.
       expect(doc.pages[0].width, greaterThan(doc.pages[0].height));
       expect(doc.pages[1].height, greaterThan(doc.pages[1].width));
-    });
-  });
-
-  group('IMSLP HTML 파싱', () {
-    test('파일 링크와 페이지 수를 뽑는다', () {
-      const html = '''
-<div class="we"><span class="we_file_info2">Complete Score</span>
-<a href="/wiki/Special:ImagefromIndex/12345/xyz" class="external">#12345</a>
-<span> - 1.23MB, 24 pp. - 0.0/10</span></div>
-<div class="we"><a href="/wiki/Special:ImagefromIndex/67890/abc">Piano Part</a>
-<span>3 pp.</span></div>
-<a href="/wiki/Special:ImagefromIndex/12345/dup">#12345</a>
-''';
-      final files = ImslpClient.parseFiles(html);
-      expect(files.length, 2);
-      expect(files[0].index, 12345);
-      expect(files[0].description, 'Complete Score');
-      expect(files[0].pages, 24);
-      expect(files[1].index, 67890);
-      expect(files[1].description, 'Piano Part');
-      expect(files[1].pages, 3);
-    });
-
-    test('검색 결과 제목에서 곡명과 작곡가를 나눈다', () {
-      const w = ImslpWork(title: 'Nocturnes, Op.9 (Chopin, Frédéric)', pageId: 1);
-      expect(w.workName, 'Nocturnes, Op.9');
-      expect(w.composer, 'Chopin, Frédéric');
     });
   });
 

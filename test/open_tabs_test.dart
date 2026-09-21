@@ -1,16 +1,38 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:his_score/core/db/database.dart';
 import 'package:his_score/features/viewer/data/score_session.dart';
 import 'package:his_score/features/viewer/domain/open_tabs.dart';
 import 'package:his_score/features/viewer/presentation/widgets/score_tab_bar.dart';
 
 void main() {
+  late AppDatabase db;
   late ProviderContainer container;
   OpenTabs tabs() => container.read(openTabsProvider.notifier);
 
-  setUp(() => container = ProviderContainer());
-  tearDown(() => container.dispose());
+  // 탭은 설정 표에 저장된다. 메모리 DB 를 물려 실제 파일을 건드리지 않는다.
+  setUp(() {
+    db = AppDatabase(NativeDatabase.memory());
+    container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+  });
+  tearDown(() async {
+    container.dispose();
+    await db.close();
+  });
+
+  /// 되살리기는 실제로 남아 있는 곡만 돌려놓는다. 확인할 곡을 하나 넣어 둔다.
+  Future<String> insertScore(String id, String title) async {
+    await db
+        .into(db.scores)
+        .insert(
+          ScoresCompanion.insert(id: id, title: title, filePath: 'scores/$id.pdf'),
+        );
+    return id;
+  }
 
   group('열어 둔 탭', () {
     test('같은 문서를 다시 열면 탭이 늘지 않는다', () {
@@ -68,6 +90,52 @@ void main() {
     });
   });
 
+  group('앱을 껐다 켜도', () {
+    // 다음에 열릴 때를 흉내 낸다. 같은 DB 를 물린 새 컨테이너다.
+    ProviderContainer reopen() {
+      final next = ProviderContainer(
+        overrides: [appDatabaseProvider.overrideWithValue(db)],
+      );
+      addTearDown(next.dispose);
+      return next;
+    }
+
+    Future<void> settle(ProviderContainer c) async {
+      for (var i = 0; i < 20; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+        if (c.read(openTabsProvider).isNotEmpty) return;
+      }
+    }
+
+    test('열어 둔 탭과 보던 자리가 돌아온다', () async {
+      final score = await insertScore('a', '첫 곡');
+      tabs().open(SessionKey.score(score), '첫 곡');
+      tabs().updatePage(SessionKey.score(score), 4);
+      // 저장은 모았다가 한 번에 한다.
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+
+      final next = reopen();
+      await settle(next);
+
+      final restored = next.read(openTabsProvider);
+      expect(restored.length, 1);
+      expect(restored.single.title, '첫 곡');
+      expect(restored.single.page, 4);
+    });
+
+    test('그사이 지워진 악보의 탭은 돌아오지 않는다', () async {
+      final kept = await insertScore('a', '남은 곡');
+      tabs().open(SessionKey.score(kept), '남은 곡');
+      tabs().open(const SessionKey.score('gone'), '지워진 곡');
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+
+      final next = reopen();
+      await settle(next);
+
+      expect(next.read(openTabsProvider).single.title, '남은 곡');
+    });
+  });
+
   testWidgets('탭 줄이 열어 둔 문서를 보여 주고 고르면 알려 준다', (tester) async {
     tabs().open(const SessionKey.score('a'), '첫 곡');
     tabs().open(const SessionKey.setlist('s'), '주일 예배');
@@ -104,6 +172,9 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.close).first);
     expect(closed?.key, const SessionKey.score('a'));
+
+    // 탭 목록은 잠시 뒤 한꺼번에 저장된다. 그 타이머를 흘려보내고 끝낸다.
+    await tester.pump(const Duration(seconds: 1));
   });
 
   testWidgets('열어 둔 탭이 없으면 자리를 차지하지 않는다', (tester) async {

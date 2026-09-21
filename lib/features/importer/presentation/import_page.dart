@@ -8,7 +8,6 @@ import '../data/cloud_providers.dart';
 import '../data/watch_folder_service.dart';
 import 'capture_page.dart';
 import 'cloud_browser_page.dart';
-import 'imslp_page.dart';
 import 'import_actions.dart';
 import '../../setlist/presentation/setlist_share_actions.dart';
 import '../../../core/i18n/tr.dart';
@@ -49,12 +48,6 @@ class ImportPage extends ConsumerWidget {
                 MaterialPageRoute(builder: (_) => CloudBrowserPage(provider: p)),
               ),
             ),
-          _Source(
-            icon: Icons.public,
-            title: tr('무료 클래식 악보'),
-            subtitle: tr('IMSLP 에서 검색해 내려받습니다'),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ImslpPage())),
-          ),
           _Source(
             icon: Icons.queue_music,
             title: tr('세트리스트 파일'),

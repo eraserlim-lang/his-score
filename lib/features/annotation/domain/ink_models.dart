@@ -173,6 +173,7 @@ class PlacedAnnotation {
     this.rotation = 0,
     this.fontSize,
     this.sortOrder = 0,
+    this.boxed = false,
   });
 
   final String id;
@@ -192,6 +193,9 @@ class PlacedAnnotation {
   final double? fontSize;
   final int sortOrder;
 
+  /// 스탬프를 네모 상자로 둘렀는지. 텍스트에는 쓰지 않는다.
+  final bool boxed;
+
   PlacedAnnotation copyWith({
     String? value,
     double? x,
@@ -200,6 +204,7 @@ class PlacedAnnotation {
     double? scale,
     double? fontSize,
     int? sortOrder,
+    bool? boxed,
   }) =>
       PlacedAnnotation(
         id: id,
@@ -212,6 +217,7 @@ class PlacedAnnotation {
         rotation: rotation,
         fontSize: fontSize ?? this.fontSize,
         sortOrder: sortOrder ?? this.sortOrder,
+        boxed: boxed ?? this.boxed,
       );
 }
 
@@ -284,6 +290,7 @@ class PageInk {
               'rotation': p.rotation,
               'fontSize': p.fontSize,
               'order': p.sortOrder,
+              if (p.boxed) 'boxed': true,
             },
         ],
         if (pencilKitData != null) 'pencilKit': base64Encode(pencilKitData!),
@@ -327,6 +334,7 @@ class PageInk {
           rotation: (m['rotation'] as num?)?.toDouble() ?? 0,
           fontSize: (m['fontSize'] as num?)?.toDouble(),
           sortOrder: m['order'] as int? ?? 0,
+          boxed: m['boxed'] == true,
         ),
       );
     }
