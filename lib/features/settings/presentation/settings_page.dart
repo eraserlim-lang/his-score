@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/settings_dao.dart';
-import '../../viewer/data/face_turn_service.dart';
 import '../../viewer/domain/screen_sleep.dart';
 import '../../../core/i18n/tr.dart';
 import '../../backup/presentation/backup_tiles.dart';
@@ -74,10 +73,9 @@ class _ChoiceTile<T> extends StatelessWidget {
               value,
               textAlign: TextAlign.end,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: scheme.primary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: scheme.primary),
             ),
           ),
           Icon(Icons.arrow_drop_down, color: scheme.onSurfaceVariant),
@@ -113,7 +111,9 @@ class SettingsPage extends ConsumerWidget {
             leading: const Icon(Icons.settings_remote),
             title: Text(tr('리모컨 모드')),
             subtitle: Text(tr('이 기기로 다른 기기의 페이지를 넘깁니다')),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RemotePage())),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const RemotePage())),
           ),
           _SectionHeader(tr('가져오기')),
           if (WatchFolderService.supported) const _WatchFolderTile(),
@@ -121,7 +121,9 @@ class SettingsPage extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text(
-              tr('Google Cloud Console 과 Dropbox App Console 에서 만든 OAuth 클라이언트 ID 를 넣습니다. 데스크톱은 http://127.0.0.1 로, 모바일은 hiscore://oauth 로 되돌아오도록 등록하세요. 비밀 키는 필요 없습니다.'),
+              tr(
+                'Google Cloud Console 과 Dropbox App Console 에서 만든 OAuth 클라이언트 ID 를 넣습니다. 데스크톱은 http://127.0.0.1 로, 모바일은 hiscore://oauth 로 되돌아오도록 등록하세요. 비밀 키는 필요 없습니다.',
+              ),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -155,14 +157,14 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
-        child: Text(
-          title,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
-        ),
-      );
+    padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
+    child: Text(
+      title,
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    ),
+  );
 }
 
 class _WatchFolderTile extends ConsumerWidget {
@@ -181,12 +183,16 @@ class _WatchFolderTile extends ConsumerWidget {
               icon: const Icon(Icons.clear),
               tooltip: tr('해제'),
               onPressed: () async {
-                final service = await ref.read(watchFolderServiceProvider.future);
+                final service = await ref.read(
+                  watchFolderServiceProvider.future,
+                );
                 await service.setFolder(null);
               },
             ),
       onTap: () async {
-        final picked = await FilePicker.getDirectoryPath(dialogTitle: tr('감시할 폴더'));
+        final picked = await FilePicker.getDirectoryPath(
+          dialogTitle: tr('감시할 폴더'),
+        );
         if (picked == null) return;
         final service = await ref.read(watchFolderServiceProvider.future);
         await service.setFolder(picked);
@@ -225,13 +231,21 @@ class _TextSettingTile extends ConsumerWidget {
               autofocus: true,
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('취소'))),
-              FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: Text(tr('저장'))),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(tr('취소')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, controller.text.trim()),
+                child: Text(tr('저장')),
+              ),
             ],
           ),
         );
         if (result == null) return;
-        await ref.read(settingsDaoProvider).set(settingKey, result.isEmpty ? null : result);
+        await ref
+            .read(settingsDaoProvider)
+            .set(settingKey, result.isEmpty ? null : result);
         // 제공자 목록이 새 ID 를 쓰도록 다시 만든다.
         ref.invalidate(settingProvider(settingKey));
       },
@@ -250,7 +264,10 @@ class _PedalTile extends ConsumerWidget {
     return _ChoiceTile<String>(
       icon: Icons.keyboard_alt_outlined,
       title: tr('페달 / 키보드 매핑'),
-      value: tr('다음 {0} · 이전 {1}', [mapping.next.length, mapping.previous.length]),
+      value: tr('다음 {0} · 이전 {1}', [
+        mapping.next.length,
+        mapping.previous.length,
+      ]),
       onSelected: (v) async {
         if (v == 'reset') {
           await ref.read(settingsDaoProvider).set(SettingKeys.pedalNext, null);
@@ -262,7 +279,9 @@ class _PedalTile extends ConsumerWidget {
         final updated = cmd == TurnCommand.next
             ? mapping.withLearned(nextKey: key.keyId)
             : mapping.withLearned(previousKey: key.keyId);
-        await ref.read(settingsDaoProvider).set(SettingKeys.pedalNext, updated.encode());
+        await ref
+            .read(settingsDaoProvider)
+            .set(SettingKeys.pedalNext, updated.encode());
       },
       items: (context) => [
         PopupMenuItem(value: 'next', child: Text(tr('"다음" 페달 학습'))),
@@ -287,9 +306,16 @@ class _PedalTile extends ConsumerWidget {
     return showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(cmd == TurnCommand.next ? tr('"다음" 페달을 밟으세요') : tr('"이전" 페달을 밟으세요')),
+        title: Text(
+          cmd == TurnCommand.next ? tr('"다음" 페달을 밟으세요') : tr('"이전" 페달을 밟으세요'),
+        ),
         content: Text(tr('키보드 키를 눌러도 됩니다.')),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('취소')))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(tr('취소')),
+          ),
+        ],
       ),
     ).then((_) {
       HardwareKeyboard.instance.removeHandler(handler);
@@ -309,13 +335,18 @@ class _LanguageTile extends ConsumerWidget {
       title: tr('언어'),
       value: AppLocale.labelOf(saved == null ? null : Locale(saved)),
       onSelected: (v) async {
-        await ref.read(settingsDaoProvider).set(SettingKeys.locale, v == 'system' ? null : v);
+        await ref
+            .read(settingsDaoProvider)
+            .set(SettingKeys.locale, v == 'system' ? null : v);
         AppLocale.override.value = v == 'system' ? null : Locale(v);
       },
       items: (context) => [
         PopupMenuItem(value: 'system', child: Text(AppLocale.labelOf(null))),
         for (final l in AppLocale.supported)
-          PopupMenuItem(value: l.languageCode, child: Text(AppLocale.labelOf(l))),
+          PopupMenuItem(
+            value: l.languageCode,
+            child: Text(AppLocale.labelOf(l)),
+          ),
       ],
     );
   }
@@ -333,37 +364,23 @@ class _ScreenSleepTile extends ConsumerWidget {
     final current = ref.watch(screenSleepProvider);
 
     String label(ScreenSleep s) => switch (s.mode) {
-      ScreenSleepMode.never => tr('끄지 않음'),
-      ScreenSleepMode.watching => tr('자동 (보고 있으면 켜 둠)'),
-      ScreenSleepMode.timed => tr('{0}분 뒤 꺼짐', [s.minutes]),
+      ScreenSleepMode.system => tr('시스템 설정'),
+      ScreenSleepMode.never => tr('안 함'),
     };
 
     return _ChoiceTile<ScreenSleep>(
       icon: Icons.brightness_high_outlined,
       title: tr('화면 자동 꺼짐'),
       value: label(current),
-      subtitle: current.mode == ScreenSleepMode.watching
-          ? tr('전면 카메라로 얼굴이 보이는지만 확인합니다')
-          : null,
-      onSelected: (v) =>
-          ref.read(settingsDaoProvider).set(SettingKeys.screenSleep, v.encode()),
+      onSelected: (v) => ref
+          .read(settingsDaoProvider)
+          .set(SettingKeys.screenSleep, v.encode()),
       items: (context) => [
-        for (final m in ScreenSleep.minuteChoices)
+        for (final mode in ScreenSleepMode.values)
           PopupMenuItem(
-            value: ScreenSleep(ScreenSleepMode.timed, minutes: m),
-            child: Text(tr('{0}분 뒤 꺼짐', [m])),
+            value: ScreenSleep(mode),
+            child: Text(label(ScreenSleep(mode))),
           ),
-        // 얼굴을 보려면 카메라가 있어야 한다. 데스크톱에서는 내놓지 않는다.
-        if (FaceTurnService.supported)
-          PopupMenuItem(
-            value: const ScreenSleep(ScreenSleepMode.watching),
-            child: Text(tr('자동 (보고 있으면 켜 둠)')),
-          ),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          value: const ScreenSleep(ScreenSleepMode.never),
-          child: Text(tr('끄지 않음')),
-        ),
       ],
     );
   }
@@ -374,18 +391,20 @@ class _ThemeTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final saved = ref.watch(settingProvider(SettingKeys.themeMode)).value ?? 'system';
+    final saved =
+        ref.watch(settingProvider(SettingKeys.themeMode)).value ?? 'system';
     String label(String v) => switch (v) {
-          'light' => tr('밝게'),
-          'dark' => tr('어둡게'),
-          _ => tr('시스템 설정'),
-        };
+      'light' => tr('밝게'),
+      'dark' => tr('어둡게'),
+      _ => tr('시스템 설정'),
+    };
     return _ChoiceTile<String>(
       icon: Icons.brightness_6_outlined,
       title: tr('테마'),
       value: label(saved),
-      onSelected: (v) =>
-          ref.read(settingsDaoProvider).set(SettingKeys.themeMode, v == 'system' ? null : v),
+      onSelected: (v) => ref
+          .read(settingsDaoProvider)
+          .set(SettingKeys.themeMode, v == 'system' ? null : v),
       items: (context) => [
         for (final v in ['system', 'light', 'dark'])
           PopupMenuItem(value: v, child: Text(label(v))),

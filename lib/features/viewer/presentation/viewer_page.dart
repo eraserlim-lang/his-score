@@ -213,7 +213,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
 
     _inkStore = InkStore(ref.read(annotationDaoProvider));
     _faceTurn = ref.read(faceTurnServiceProvider);
-    _awake = ScreenAwake(_faceTurn)..apply(ref.read(screenSleepProvider));
+    _awake = ScreenAwake()..apply(ref.read(screenSleepProvider));
     _armChromeTimer();
 
     // 페달, 얼굴 제스처, 리모컨, 리드 기기가 보내는 명령을 받는다.
@@ -716,7 +716,6 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
             child: Listener(
               behavior: HitTestBehavior.translucent,
               onPointerDown: (_) {
-                _awake.touch();
                 if (_chromeVisible) _armChromeTimer();
               },
               child: Stack(
