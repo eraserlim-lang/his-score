@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/app_version.dart';
 import '../../../core/db/settings_dao.dart';
 import '../../viewer/domain/screen_sleep.dart';
 import '../../../core/i18n/tr.dart';
@@ -144,6 +145,22 @@ class SettingsPage extends ConsumerWidget {
             leading: Icon(Icons.info_outline),
             title: Text('HIScore'),
             subtitle: Text(tr('모든 기기에서 쓰는 악보 뷰어')),
+          ),
+          // 기기에 올라간 빌드가 어느 것인지 여기서 확인한다.
+          // 앞은 버전(pubspec 의 version), 뒤는 스토어에 올릴 때마다 느는 빌드 번호다.
+          ListTile(
+            leading: const Icon(Icons.new_releases_outlined),
+            title: Text(tr('버전')),
+            subtitle: Text(
+              switch (ref.watch(appVersionProvider)) {
+                AsyncData(:final value) => tr('{0} (빌드 {1})', [
+                  value.version,
+                  value.buildNumber,
+                ]),
+                AsyncError() => tr('알 수 없음'),
+                _ => '',
+              },
+            ),
           ),
         ],
       ),

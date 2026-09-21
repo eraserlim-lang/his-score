@@ -523,5 +523,8 @@
   "세트에 {0}번": "{0}× in set",
   "세트에 담기": "Add to set",
   "한 번 더 담기": "Add again",
-  "세트리스트 보기": "View setlist"
+  "세트리스트 보기": "View setlist",
+  "버전": "Version",
+  "{0} (빌드 {1})": "{0} (build {1})",
+  "알 수 없음": "Unknown"
 }
