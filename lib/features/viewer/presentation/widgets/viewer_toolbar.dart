@@ -114,7 +114,8 @@ class ViewerToolbar extends StatelessWidget {
         ),
         PopupMenuButton<String>(
           tooltip: tr('페이지 도구'),
-          icon: const Icon(Icons.auto_stories_outlined),
+          // 페이지 도구에서 가장 자주 여는 것이 여백·기울기 조정이다.
+          icon: const Icon(Icons.crop),
           onSelected: onPageMenu,
           itemBuilder: (context) => [
             PopupMenuItem(
@@ -194,7 +195,9 @@ class ViewerToolbar extends StatelessWidget {
         IconButton(
           onPressed: () => controller.setPerformanceMode(true),
           tooltip: tr('연주 모드'),
-          icon: const Icon(Icons.music_note_outlined),
+          // 플레이어(음표)와 같은 아이콘이라 헷갈렸다. 연주 모드는 막대를
+          // 걷고 악보만 크게 보이는 것이라 전체 화면으로 나타낸다.
+          icon: const Icon(Icons.fullscreen),
         ),
         IconButton(
           onPressed: onSettings,
@@ -371,7 +374,8 @@ class _LayoutButton extends StatelessWidget {
   }
 
   IconData _iconFor(PageLayout layout) => switch (layout) {
-    PageLayout.single => Icons.crop_portrait,
+    // 빈 사각형(crop_portrait)은 1페이지로 읽히지 않았다. 귀접힌 종이 한 장.
+    PageLayout.single => Icons.insert_drive_file_outlined,
     PageLayout.scroll => Icons.swap_vert,
     PageLayout.half => Icons.splitscreen,
     PageLayout.dual => Icons.import_contacts,
