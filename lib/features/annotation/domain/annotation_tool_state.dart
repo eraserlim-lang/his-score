@@ -10,6 +10,7 @@ enum InkTool { pen, eraser, stamp, text, shape, select }
 class AnnotationToolState extends ChangeNotifier {
   InkTool _tool = InkTool.pen;
   PenPreset _preset = PenPreset.pen;
+
   /// 악보 위 필기는 인쇄된 음표와 섞이지 않아야 한다. 빨강이 가장 눈에 띈다.
   Color _color = ViewerColors.inkDefault;
 
@@ -47,13 +48,39 @@ class AnnotationToolState extends ChangeNotifier {
   /// 손가락으로도 그릴지. 스타일러스가 없는 기기에서는 켜야 한다.
   bool get fingerDraws => _fingerDraws || !_stylusSeen;
 
+  /// 펜슬 두 번 두드리기로 돌아갈 도구. 도구를 바꿀 때마다 직전 것을 적어 둔다.
+  (InkTool, PenPreset)? _previous;
+
+  void _remember() => _previous = (_tool, _preset);
+
   void setTool(InkTool tool) {
     if (tool == _tool) return;
+    _remember();
     _tool = tool;
     notifyListeners();
   }
 
+  /// 애플 펜슬을 두 번 두드렸을 때. 직전 도구로 돌아가고, 직전 도구가
+  /// 없으면 지우개로 간다. 지우개였는데 직전 도구가 없으면 펜으로 온다.
+  /// 되풀이하면 두 도구 사이를 오간다.
+  void swapToPrevious() {
+    final now = (_tool, _preset);
+    final prev = _previous;
+    if (prev != null && prev != now) {
+      _tool = prev.$1;
+      _preset = prev.$2;
+    } else if (_tool != InkTool.eraser) {
+      _tool = InkTool.eraser;
+    } else {
+      _tool = InkTool.pen;
+    }
+    _previous = now;
+    notifyListeners();
+  }
+
   void setPreset(PenPreset preset) {
+    if (_tool == InkTool.pen && _preset == preset) return;
+    _remember();
     _preset = preset;
     _tool = InkTool.pen;
     notifyListeners();
@@ -86,6 +113,7 @@ class AnnotationToolState extends ChangeNotifier {
 
   void setStamp(String id) {
     _stampId = id;
+    if (_tool != InkTool.stamp) _remember();
     _tool = InkTool.stamp;
     notifyListeners();
   }
@@ -98,6 +126,7 @@ class AnnotationToolState extends ChangeNotifier {
 
   void setShape(ShapeKind shape) {
     _shape = shape;
+    if (_tool != InkTool.shape) _remember();
     _tool = InkTool.shape;
     notifyListeners();
   }

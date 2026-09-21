@@ -62,6 +62,10 @@ class _ViewerPageState extends ConsumerState<ViewerPage> {
     final session = ref.watch(scoreSessionProvider(widget.sessionKey));
 
     return Scaffold(
+      // 필기 중 글자를 넣으려고 키보드가 뜨면 기본으로는 본문이 그만큼 줄어
+      // 악보가 작아졌다가 돌아온다. 대화상자는 스스로 키보드를 피하니 악보는
+      // 그대로 둔다.
+      resizeToAvoidBottomInset: false,
       backgroundColor: ViewerColors.canvasOf(Theme.of(context).brightness),
       body: session.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -109,6 +113,10 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   /// 보는 동안 화면이 꺼지지 않게 붙잡아 둔다.
   late final ScreenAwake _awake;
   final _tools = AnnotationToolState();
+
+  /// 애플 펜슬 두 번 두드리기가 네이티브에서 넘어오는 길. 뷰어가 떠 있을
+  /// 때만 받는다.
+  static const _pencilChannel = MethodChannel('hiscore/pencil');
   bool _chromeVisible = true;
 
   /// 메뉴를 띄운 뒤 손이 닿지 않으면 이만큼 지나 거둔다.
@@ -189,6 +197,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
   @override
   void initState() {
     super.initState();
+    _pencilChannel.setMethodCallHandler(_onPencilChannel);
     final score = widget.session.primaryScore;
     final pageCount = widget.session.pageCount;
 
@@ -279,6 +288,7 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
 
   @override
   void dispose() {
+    _pencilChannel.setMethodCallHandler(null);
     _chromeTimer?.cancel();
     _flashTimer?.cancel();
     _awake.dispose();
@@ -406,6 +416,30 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
     } else {
       Navigator.of(context).maybePop();
     }
+  }
+
+  /// 펜슬로 악보를 짚었다. 필기 중이 아니면 필기 모드로 들어간다.
+  ///
+  /// 이번 누름은 모드만 바꾸고 획은 남기지 않는다. 필기 층이 켜지기 전에
+  /// 이미 눌린 손이라 그 층이 받을 수 없다. 다음 획부터 그어진다.
+  void _enterPencilModeOnStylus(PointerDownEvent e) {
+    if (e.kind != PointerDeviceKind.stylus &&
+        e.kind != PointerDeviceKind.invertedStylus) {
+      return;
+    }
+    if (_controller.state.overlayEditing) return;
+    _controller.setAnnotating(true);
+  }
+
+  /// 애플 펜슬을 두 번 두드렸다. 필기 중이면 직전 도구(없으면 지우개)로,
+  /// 아니면 필기 모드로 들어간다.
+  Future<void> _onPencilChannel(MethodCall call) async {
+    if (call.method != 'doubleTap' || !mounted) return;
+    if (!_controller.state.annotating) {
+      if (!_controller.state.overlayEditing) _controller.setAnnotating(true);
+      return;
+    }
+    _tools.swapToPrevious();
   }
 
   ViewPage get _currentPage =>
@@ -720,10 +754,16 @@ class _ViewerBodyState extends ConsumerState<_ViewerBody> {
               },
               child: Stack(
                 children: [
+                  // 펜슬이 악보에 닿으면 필기 모드로 들어간다. 막대 위의 누름은
+                  // 여기까지 오지 않아 버튼을 펜슬로 눌러도 필기 모드가 되지 않는다.
                   Positioned.fill(
-                    child: PagePreviewScope(
-                      preview: state.scrubbing,
-                      child: _buildContent(state),
+                    child: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: _enterPencilModeOnStylus,
+                      child: PagePreviewScope(
+                        preview: state.scrubbing,
+                        child: _buildContent(state),
+                      ),
                     ),
                   ),
                   if (!state.overlayEditing)
