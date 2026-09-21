@@ -12,7 +12,24 @@ abstract final class PencilKitRenderer {
 
   static bool get supported => !kIsWeb && Platform.isIOS;
 
-  static Future<Uint8List?> render(Uint8List drawing, {required int width, required int height}) async {
+  /// 그림에서 마지막 획을 뗀 그림을 돌려준다. 남은 획이 없으면 빈 바이트,
+  /// 뗄 획이 없거나 이 플랫폼에서 못 하면 null.
+  static Future<Uint8List?> removeLastStroke(Uint8List drawing) async {
+    if (!supported || drawing.isEmpty) return null;
+    try {
+      return await _channel.invokeMethod<Uint8List>('removeLastStroke', {
+        'data': drawing,
+      });
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  static Future<Uint8List?> render(
+    Uint8List drawing, {
+    required int width,
+    required int height,
+  }) async {
     if (!supported || drawing.isEmpty) return null;
     try {
       return await _channel.invokeMethod<Uint8List>('render', {

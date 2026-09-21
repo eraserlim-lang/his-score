@@ -29,6 +29,22 @@ final class PencilKitViewFactory: NSObject, FlutterPlatformViewFactory {
     // 화면에 캔버스가 없어도 PKDrawing 을 PNG 로 굽는 정적 채널. 내보내기에서 쓴다.
     let render = FlutterMethodChannel(name: "hiscore/pencilkit_render", binaryMessenger: registrar.messenger())
     render.setMethodCallHandler { call, result in
+      // 지우개 옵션의 "직전 필기 지우기". 그림에서 마지막 획을 떼어 돌려준다.
+      // 획은 그은 차례로 쌓이므로 마지막이 가장 나중에 그은 것이다.
+      // 떼고 나서 남은 획이 없으면 빈 바이트, 뗄 획이 없으면 nil 이다.
+      if call.method == "removeLastStroke" {
+        guard let dict = call.arguments as? [String: Any],
+              let data = dict["data"] as? FlutterStandardTypedData,
+              var drawing = try? PKDrawing(data: data.data),
+              !drawing.strokes.isEmpty else {
+          result(nil)
+          return
+        }
+        drawing.strokes.removeLast()
+        let out = drawing.strokes.isEmpty ? Data() : drawing.dataRepresentation()
+        result(FlutterStandardTypedData(bytes: out))
+        return
+      }
       guard call.method == "render",
             let dict = call.arguments as? [String: Any],
             let data = dict["data"] as? FlutterStandardTypedData,

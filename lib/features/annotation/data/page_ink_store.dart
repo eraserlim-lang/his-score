@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/db/tables.dart' show StrokeTool;
 import '../domain/ink_models.dart';
+import 'pencilkit_renderer.dart';
 import 'annotation_dao.dart';
 
 /// 되돌릴 수 있는 편집 하나.
@@ -22,7 +24,8 @@ class _AddStrokes extends _InkEdit {
   final List<Stroke> strokes;
 
   @override
-  PageInk apply(PageInk ink) => ink.copyWith(strokes: [...ink.strokes, ...strokes]);
+  PageInk apply(PageInk ink) =>
+      ink.copyWith(strokes: [...ink.strokes, ...strokes]);
 
   @override
   PageInk revert(PageInk ink) {
@@ -51,10 +54,8 @@ class _ReplaceStrokes extends _InkEdit {
   PageInk apply(PageInk ink) {
     final ids = removed.map((s) => s.id).toSet();
     return ink.copyWith(
-      strokes: [
-        ...ink.strokes.where((s) => !ids.contains(s.id)),
-        ...added,
-      ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
+      strokes: [...ink.strokes.where((s) => !ids.contains(s.id)), ...added]
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
     );
   }
 
@@ -62,10 +63,8 @@ class _ReplaceStrokes extends _InkEdit {
   PageInk revert(PageInk ink) {
     final ids = added.map((s) => s.id).toSet();
     return ink.copyWith(
-      strokes: [
-        ...ink.strokes.where((s) => !ids.contains(s.id)),
-        ...removed,
-      ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
+      strokes: [...ink.strokes.where((s) => !ids.contains(s.id)), ...removed]
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
     );
   }
 
@@ -109,13 +108,13 @@ class _UpdatePlaced extends _InkEdit {
 
   @override
   PageInk apply(PageInk ink) => ink.copyWith(
-        placed: [for (final p in ink.placed) p.id == after.id ? after : p],
-      );
+    placed: [for (final p in ink.placed) p.id == after.id ? after : p],
+  );
 
   @override
   PageInk revert(PageInk ink) => ink.copyWith(
-        placed: [for (final p in ink.placed) p.id == before.id ? before : p],
-      );
+    placed: [for (final p in ink.placed) p.id == before.id ? before : p],
+  );
 
   @override
   Future<void> persist(AnnotationDao dao, String scoreId, int page) =>
@@ -270,6 +269,38 @@ class PageInkController extends ChangeNotifier {
   void clear() {
     if (_ink.isEmpty) return;
     _commit(_ClearPage(_ink));
+  }
+
+  /// 지울 수 있는 펜 획이 있는지. 도형·스탬프·글자는 치지 않는다.
+  bool get hasPenStroke =>
+      (_ink.pencilKitData?.isNotEmpty ?? false) || _ink.strokes.any(_isPen);
+
+  static bool _isPen(Stroke s) =>
+      s.tool != StrokeTool.shape && s.tool != StrokeTool.eraser;
+
+  /// 직전에 그은 펜 획 하나를 지운다. 되돌리기로 살릴 수 있다.
+  ///
+  /// 지우개로 문질러 지우기 번거로운 방금 그은 한 획을 바로 뗀다. iOS 는 펜
+  /// 획을 PencilKit 이 그림 한 장으로 들고 있어 네이티브에서 마지막 획을 떼어
+  /// 온다. 다른 플랫폼은 펜 획 가운데 가장 나중에 그은 것을 뺀다.
+  /// 지운 것이 있으면 참.
+  Future<bool> removeLastPenStroke() async {
+    final pk = _ink.pencilKitData;
+    if (pk != null && pk.isNotEmpty) {
+      final next = await PencilKitRenderer.removeLastStroke(pk);
+      if (next != null) {
+        setPencilKit(next.isEmpty ? null : next);
+        return true;
+      }
+    }
+    Stroke? last;
+    for (final s in _ink.strokes) {
+      if (!_isPen(s)) continue;
+      if (last == null || s.sortOrder > last.sortOrder) last = s;
+    }
+    if (last == null) return false;
+    erase([last], const []);
+    return true;
   }
 
   /// PencilKit 이 그림을 바꿀 때마다 부른다. 획 단위가 아니라 그림 전체다.

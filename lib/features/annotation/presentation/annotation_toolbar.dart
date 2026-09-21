@@ -202,6 +202,27 @@ class AnnotationToolbar extends StatelessWidget {
     if (picked != null) tools.setPaletteColor(index, picked);
   }
 
+  /// 방금 그은 펜 획 하나를 뗀다. 판을 열어 둔 채 거듭 누르면 하나씩 더 뗀다.
+  /// 되돌리기로 살릴 수 있다.
+  Widget? _removeLastButton() {
+    final page = pageController;
+    if (page == null) return null;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: ListenableBuilder(
+        listenable: page,
+        builder: (context, _) => SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonalIcon(
+            onPressed: page.hasPenStroke ? page.removeLastPenStroke : null,
+            icon: const Icon(Icons.backspace_outlined),
+            label: Text(tr('직전 필기 지우기')),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showEraser(BuildContext context) {
     showCenterSheet<void>(
       context,
@@ -213,6 +234,7 @@ class AnnotationToolbar extends StatelessWidget {
         min: 6,
         max: 60,
         onChanged: tools.setEraserRadius,
+        footer: _removeLastButton(),
         preview: (v) => SizedBox(
           height: 130,
           child: Center(
@@ -487,6 +509,7 @@ class _SliderSheet extends StatelessWidget {
     required this.max,
     required this.onChanged,
     required this.preview,
+    this.footer,
   });
 
   final String title;
@@ -496,6 +519,9 @@ class _SliderSheet extends StatelessWidget {
   final double max;
   final ValueChanged<double> onChanged;
   final Widget Function(double) preview;
+
+  /// 슬라이더 아래에 붙는 것. 지우개 옵션의 "직전 필기 지우기" 가 쓴다.
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -513,6 +539,7 @@ class _SliderSheet extends StatelessWidget {
                 const SizedBox(height: 12),
                 preview(v),
                 Slider(value: v, min: min, max: max, onChanged: onChanged),
+                ?footer,
               ],
             ),
           ),
