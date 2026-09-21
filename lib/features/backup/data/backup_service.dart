@@ -27,12 +27,13 @@ class BackupService {
   List<TableInfo> get _tables => [
         _db.scores,
         _db.scorePages,
-        _db.bookmarks,
         _db.jumpButtons,
         _db.tags,
         _db.scoreTags,
         _db.setlists,
         _db.setlistItems,
+        // 세트리스트 북마크가 세트를 가리키므로 세트 뒤에 되살린다.
+        _db.bookmarks,
         _db.inkStrokes,
         _db.annotations,
         _db.recordings,

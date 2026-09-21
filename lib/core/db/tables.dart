@@ -92,8 +92,8 @@ class ScorePages extends Table {
 
   @override
   List<Set<Column>> get uniqueKeys => [
-        {scoreId, displayOrder},
-      ];
+    {scoreId, displayOrder},
+  ];
 }
 
 /// 북마크. PDF 목차를 가져오면 여기에 채운다.
@@ -103,6 +103,18 @@ class Bookmarks extends Table {
       text().references(Scores, #id, onDelete: KeyAction.cascade)();
   IntColumn get page => integer()();
   TextColumn get label => text()();
+
+  /// 세트리스트 북마크면 그 세트, 곡 북마크면 null.
+  ///
+  /// 곡을 볼 때와 세트를 볼 때 필요한 표시가 다르다. 세트에서는 "2부 시작",
+  /// "앙코르" 처럼 연주 순서를 따라 곡을 가로질러 단다. 그 북마크를 곡에 달면
+  /// 같은 곡이 든 다른 세트에도 나타나 섞였다. [scoreId] 와 [page] 는 어느
+  /// 경우든 가리키는 쪽이라, 세트 안에서 순서를 바꿔도 같은 쪽을 찾아간다.
+  TextColumn get setlistId => text().nullable().references(
+    Setlists,
+    #id,
+    onDelete: KeyAction.cascade,
+  )();
 
   /// 목차 계층. 최상위는 0.
   IntColumn get depth => integer().withDefault(const Constant(0))();
@@ -192,10 +204,10 @@ class InkStrokes extends Table {
       text().references(Scores, #id, onDelete: KeyAction.cascade)();
   IntColumn get page => integer()();
 
-  IntColumn get format => intEnum<InkFormat>()
-      .withDefault(Constant(InkFormat.vector.index))();
-  IntColumn get tool => intEnum<StrokeTool>()
-      .withDefault(Constant(StrokeTool.pen.index))();
+  IntColumn get format =>
+      intEnum<InkFormat>().withDefault(Constant(InkFormat.vector.index))();
+  IntColumn get tool =>
+      intEnum<StrokeTool>().withDefault(Constant(StrokeTool.pen.index))();
 
   IntColumn get color => integer().withDefault(const Constant(0xFF000000))();
   RealColumn get width => real().withDefault(const Constant(2))();

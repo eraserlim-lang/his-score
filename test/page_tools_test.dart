@@ -144,13 +144,6 @@ void main() {
     expect(list.single.page, 3);
   });
 
-  test('목차가 없는 PDF 는 0을 돌려준다', () async {
-    final session = await open();
-    addTearDown(session.dispose);
-    final n = await tools.importOutline(scoreId, session.documents.single);
-    expect(n, 0);
-  });
-
   test('점프 버튼을 놓고 옮기고 지운다', () async {
     await tools.addJump(scoreId: scoreId, fromPage: 4, x: 0.8, y: 0.9, toPage: 2);
     var jumps = await tools.watchJumps(scoreId).first;

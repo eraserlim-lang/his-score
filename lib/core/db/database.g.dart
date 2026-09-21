@@ -1978,6 +1978,412 @@ class ScorePagesCompanion extends UpdateCompanion<ScorePage> {
   }
 }
 
+class $SetlistsTable extends Setlists with TableInfo<$SetlistsTable, Setlist> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SetlistsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _performedAtMeta = const VerificationMeta(
+    'performedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> performedAt = GeneratedColumn<DateTime>(
+    'performed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    note,
+    performedAt,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'setlists';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Setlist> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('performed_at')) {
+      context.handle(
+        _performedAtMeta,
+        performedAt.isAcceptableOrUnknown(
+          data['performed_at']!,
+          _performedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Setlist map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Setlist(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      performedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}performed_at'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $SetlistsTable createAlias(String alias) {
+    return $SetlistsTable(attachedDatabase, alias);
+  }
+}
+
+class Setlist extends DataClass implements Insertable<Setlist> {
+  final String id;
+  final String name;
+  final String? note;
+  final DateTime? performedAt;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const Setlist({
+    required this.id,
+    required this.name,
+    this.note,
+    this.performedAt,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    if (!nullToAbsent || performedAt != null) {
+      map['performed_at'] = Variable<DateTime>(performedAt);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  SetlistsCompanion toCompanion(bool nullToAbsent) {
+    return SetlistsCompanion(
+      id: Value(id),
+      name: Value(name),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      performedAt: performedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(performedAt),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory Setlist.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Setlist(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      note: serializer.fromJson<String?>(json['note']),
+      performedAt: serializer.fromJson<DateTime?>(json['performedAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'note': serializer.toJson<String?>(note),
+      'performedAt': serializer.toJson<DateTime?>(performedAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  Setlist copyWith({
+    String? id,
+    String? name,
+    Value<String?> note = const Value.absent(),
+    Value<DateTime?> performedAt = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => Setlist(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    note: note.present ? note.value : this.note,
+    performedAt: performedAt.present ? performedAt.value : this.performedAt,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  Setlist copyWithCompanion(SetlistsCompanion data) {
+    return Setlist(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      note: data.note.present ? data.note.value : this.note,
+      performedAt: data.performedAt.present
+          ? data.performedAt.value
+          : this.performedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Setlist(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('note: $note, ')
+          ..write('performedAt: $performedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, name, note, performedAt, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Setlist &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.note == this.note &&
+          other.performedAt == this.performedAt &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class SetlistsCompanion extends UpdateCompanion<Setlist> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> note;
+  final Value<DateTime?> performedAt;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const SetlistsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.note = const Value.absent(),
+    this.performedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SetlistsCompanion.insert({
+    required String id,
+    required String name,
+    this.note = const Value.absent(),
+    this.performedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<Setlist> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? note,
+    Expression<DateTime>? performedAt,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (note != null) 'note': note,
+      if (performedAt != null) 'performed_at': performedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SetlistsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? note,
+    Value<DateTime?>? performedAt,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return SetlistsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      note: note ?? this.note,
+      performedAt: performedAt ?? this.performedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (performedAt.present) {
+      map['performed_at'] = Variable<DateTime>(performedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SetlistsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('note: $note, ')
+          ..write('performedAt: $performedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $BookmarksTable extends Bookmarks
     with TableInfo<$BookmarksTable, Bookmark> {
   @override
@@ -2025,6 +2431,20 @@ class $BookmarksTable extends Bookmarks
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _setlistIdMeta = const VerificationMeta(
+    'setlistId',
+  );
+  @override
+  late final GeneratedColumn<String> setlistId = GeneratedColumn<String>(
+    'setlist_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES setlists (id) ON DELETE CASCADE',
+    ),
+  );
   static const VerificationMeta _depthMeta = const VerificationMeta('depth');
   @override
   late final GeneratedColumn<int> depth = GeneratedColumn<int>(
@@ -2053,6 +2473,7 @@ class $BookmarksTable extends Bookmarks
     scoreId,
     page,
     label,
+    setlistId,
     depth,
     sortOrder,
   ];
@@ -2097,6 +2518,12 @@ class $BookmarksTable extends Bookmarks
     } else if (isInserting) {
       context.missing(_labelMeta);
     }
+    if (data.containsKey('setlist_id')) {
+      context.handle(
+        _setlistIdMeta,
+        setlistId.isAcceptableOrUnknown(data['setlist_id']!, _setlistIdMeta),
+      );
+    }
     if (data.containsKey('depth')) {
       context.handle(
         _depthMeta,
@@ -2134,6 +2561,10 @@ class $BookmarksTable extends Bookmarks
         DriftSqlType.string,
         data['${effectivePrefix}label'],
       )!,
+      setlistId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}setlist_id'],
+      ),
       depth: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}depth'],
@@ -2157,6 +2588,14 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
   final int page;
   final String label;
 
+  /// 세트리스트 북마크면 그 세트, 곡 북마크면 null.
+  ///
+  /// 곡을 볼 때와 세트를 볼 때 필요한 표시가 다르다. 세트에서는 "2부 시작",
+  /// "앙코르" 처럼 연주 순서를 따라 곡을 가로질러 단다. 그 북마크를 곡에 달면
+  /// 같은 곡이 든 다른 세트에도 나타나 섞였다. [scoreId] 와 [page] 는 어느
+  /// 경우든 가리키는 쪽이라, 세트 안에서 순서를 바꿔도 같은 쪽을 찾아간다.
+  final String? setlistId;
+
   /// 목차 계층. 최상위는 0.
   final int depth;
   final int sortOrder;
@@ -2165,6 +2604,7 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     required this.scoreId,
     required this.page,
     required this.label,
+    this.setlistId,
     required this.depth,
     required this.sortOrder,
   });
@@ -2175,6 +2615,9 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     map['score_id'] = Variable<String>(scoreId);
     map['page'] = Variable<int>(page);
     map['label'] = Variable<String>(label);
+    if (!nullToAbsent || setlistId != null) {
+      map['setlist_id'] = Variable<String>(setlistId);
+    }
     map['depth'] = Variable<int>(depth);
     map['sort_order'] = Variable<int>(sortOrder);
     return map;
@@ -2186,6 +2629,9 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       scoreId: Value(scoreId),
       page: Value(page),
       label: Value(label),
+      setlistId: setlistId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(setlistId),
       depth: Value(depth),
       sortOrder: Value(sortOrder),
     );
@@ -2201,6 +2647,7 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       scoreId: serializer.fromJson<String>(json['scoreId']),
       page: serializer.fromJson<int>(json['page']),
       label: serializer.fromJson<String>(json['label']),
+      setlistId: serializer.fromJson<String?>(json['setlistId']),
       depth: serializer.fromJson<int>(json['depth']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
     );
@@ -2213,6 +2660,7 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       'scoreId': serializer.toJson<String>(scoreId),
       'page': serializer.toJson<int>(page),
       'label': serializer.toJson<String>(label),
+      'setlistId': serializer.toJson<String?>(setlistId),
       'depth': serializer.toJson<int>(depth),
       'sortOrder': serializer.toJson<int>(sortOrder),
     };
@@ -2223,6 +2671,7 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     String? scoreId,
     int? page,
     String? label,
+    Value<String?> setlistId = const Value.absent(),
     int? depth,
     int? sortOrder,
   }) => Bookmark(
@@ -2230,6 +2679,7 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     scoreId: scoreId ?? this.scoreId,
     page: page ?? this.page,
     label: label ?? this.label,
+    setlistId: setlistId.present ? setlistId.value : this.setlistId,
     depth: depth ?? this.depth,
     sortOrder: sortOrder ?? this.sortOrder,
   );
@@ -2239,6 +2689,7 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       scoreId: data.scoreId.present ? data.scoreId.value : this.scoreId,
       page: data.page.present ? data.page.value : this.page,
       label: data.label.present ? data.label.value : this.label,
+      setlistId: data.setlistId.present ? data.setlistId.value : this.setlistId,
       depth: data.depth.present ? data.depth.value : this.depth,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
     );
@@ -2251,6 +2702,7 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
           ..write('scoreId: $scoreId, ')
           ..write('page: $page, ')
           ..write('label: $label, ')
+          ..write('setlistId: $setlistId, ')
           ..write('depth: $depth, ')
           ..write('sortOrder: $sortOrder')
           ..write(')'))
@@ -2258,7 +2710,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
   }
 
   @override
-  int get hashCode => Object.hash(id, scoreId, page, label, depth, sortOrder);
+  int get hashCode =>
+      Object.hash(id, scoreId, page, label, setlistId, depth, sortOrder);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2267,6 +2720,7 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
           other.scoreId == this.scoreId &&
           other.page == this.page &&
           other.label == this.label &&
+          other.setlistId == this.setlistId &&
           other.depth == this.depth &&
           other.sortOrder == this.sortOrder);
 }
@@ -2276,6 +2730,7 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
   final Value<String> scoreId;
   final Value<int> page;
   final Value<String> label;
+  final Value<String?> setlistId;
   final Value<int> depth;
   final Value<int> sortOrder;
   final Value<int> rowid;
@@ -2284,6 +2739,7 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     this.scoreId = const Value.absent(),
     this.page = const Value.absent(),
     this.label = const Value.absent(),
+    this.setlistId = const Value.absent(),
     this.depth = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2293,6 +2749,7 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     required String scoreId,
     required int page,
     required String label,
+    this.setlistId = const Value.absent(),
     this.depth = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2305,6 +2762,7 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     Expression<String>? scoreId,
     Expression<int>? page,
     Expression<String>? label,
+    Expression<String>? setlistId,
     Expression<int>? depth,
     Expression<int>? sortOrder,
     Expression<int>? rowid,
@@ -2314,6 +2772,7 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
       if (scoreId != null) 'score_id': scoreId,
       if (page != null) 'page': page,
       if (label != null) 'label': label,
+      if (setlistId != null) 'setlist_id': setlistId,
       if (depth != null) 'depth': depth,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (rowid != null) 'rowid': rowid,
@@ -2325,6 +2784,7 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     Value<String>? scoreId,
     Value<int>? page,
     Value<String>? label,
+    Value<String?>? setlistId,
     Value<int>? depth,
     Value<int>? sortOrder,
     Value<int>? rowid,
@@ -2334,6 +2794,7 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
       scoreId: scoreId ?? this.scoreId,
       page: page ?? this.page,
       label: label ?? this.label,
+      setlistId: setlistId ?? this.setlistId,
       depth: depth ?? this.depth,
       sortOrder: sortOrder ?? this.sortOrder,
       rowid: rowid ?? this.rowid,
@@ -2355,6 +2816,9 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     if (label.present) {
       map['label'] = Variable<String>(label.value);
     }
+    if (setlistId.present) {
+      map['setlist_id'] = Variable<String>(setlistId.value);
+    }
     if (depth.present) {
       map['depth'] = Variable<int>(depth.value);
     }
@@ -2374,6 +2838,7 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
           ..write('scoreId: $scoreId, ')
           ..write('page: $page, ')
           ..write('label: $label, ')
+          ..write('setlistId: $setlistId, ')
           ..write('depth: $depth, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('rowid: $rowid')
@@ -3389,412 +3854,6 @@ class ScoreTagsCompanion extends UpdateCompanion<ScoreTag> {
     return (StringBuffer('ScoreTagsCompanion(')
           ..write('scoreId: $scoreId, ')
           ..write('tagId: $tagId, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $SetlistsTable extends Setlists with TableInfo<$SetlistsTable, Setlist> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $SetlistsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _noteMeta = const VerificationMeta('note');
-  @override
-  late final GeneratedColumn<String> note = GeneratedColumn<String>(
-    'note',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _performedAtMeta = const VerificationMeta(
-    'performedAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> performedAt = GeneratedColumn<DateTime>(
-    'performed_at',
-    aliasedName,
-    true,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: false,
-    defaultValue: currentDateAndTime,
-  );
-  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
-    'updatedAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-    'updated_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: false,
-    defaultValue: currentDateAndTime,
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    name,
-    note,
-    performedAt,
-    createdAt,
-    updatedAt,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'setlists';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<Setlist> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('note')) {
-      context.handle(
-        _noteMeta,
-        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
-      );
-    }
-    if (data.containsKey('performed_at')) {
-      context.handle(
-        _performedAtMeta,
-        performedAt.isAcceptableOrUnknown(
-          data['performed_at']!,
-          _performedAtMeta,
-        ),
-      );
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
-    }
-    if (data.containsKey('updated_at')) {
-      context.handle(
-        _updatedAtMeta,
-        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
-      );
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  Setlist map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Setlist(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      note: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}note'],
-      ),
-      performedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}performed_at'],
-      ),
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}created_at'],
-      )!,
-      updatedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}updated_at'],
-      )!,
-    );
-  }
-
-  @override
-  $SetlistsTable createAlias(String alias) {
-    return $SetlistsTable(attachedDatabase, alias);
-  }
-}
-
-class Setlist extends DataClass implements Insertable<Setlist> {
-  final String id;
-  final String name;
-  final String? note;
-  final DateTime? performedAt;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  const Setlist({
-    required this.id,
-    required this.name,
-    this.note,
-    this.performedAt,
-    required this.createdAt,
-    required this.updatedAt,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['name'] = Variable<String>(name);
-    if (!nullToAbsent || note != null) {
-      map['note'] = Variable<String>(note);
-    }
-    if (!nullToAbsent || performedAt != null) {
-      map['performed_at'] = Variable<DateTime>(performedAt);
-    }
-    map['created_at'] = Variable<DateTime>(createdAt);
-    map['updated_at'] = Variable<DateTime>(updatedAt);
-    return map;
-  }
-
-  SetlistsCompanion toCompanion(bool nullToAbsent) {
-    return SetlistsCompanion(
-      id: Value(id),
-      name: Value(name),
-      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
-      performedAt: performedAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(performedAt),
-      createdAt: Value(createdAt),
-      updatedAt: Value(updatedAt),
-    );
-  }
-
-  factory Setlist.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Setlist(
-      id: serializer.fromJson<String>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
-      note: serializer.fromJson<String?>(json['note']),
-      performedAt: serializer.fromJson<DateTime?>(json['performedAt']),
-      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
-      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'name': serializer.toJson<String>(name),
-      'note': serializer.toJson<String?>(note),
-      'performedAt': serializer.toJson<DateTime?>(performedAt),
-      'createdAt': serializer.toJson<DateTime>(createdAt),
-      'updatedAt': serializer.toJson<DateTime>(updatedAt),
-    };
-  }
-
-  Setlist copyWith({
-    String? id,
-    String? name,
-    Value<String?> note = const Value.absent(),
-    Value<DateTime?> performedAt = const Value.absent(),
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) => Setlist(
-    id: id ?? this.id,
-    name: name ?? this.name,
-    note: note.present ? note.value : this.note,
-    performedAt: performedAt.present ? performedAt.value : this.performedAt,
-    createdAt: createdAt ?? this.createdAt,
-    updatedAt: updatedAt ?? this.updatedAt,
-  );
-  Setlist copyWithCompanion(SetlistsCompanion data) {
-    return Setlist(
-      id: data.id.present ? data.id.value : this.id,
-      name: data.name.present ? data.name.value : this.name,
-      note: data.note.present ? data.note.value : this.note,
-      performedAt: data.performedAt.present
-          ? data.performedAt.value
-          : this.performedAt,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('Setlist(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('note: $note, ')
-          ..write('performedAt: $performedAt, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(id, name, note, performedAt, createdAt, updatedAt);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is Setlist &&
-          other.id == this.id &&
-          other.name == this.name &&
-          other.note == this.note &&
-          other.performedAt == this.performedAt &&
-          other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
-}
-
-class SetlistsCompanion extends UpdateCompanion<Setlist> {
-  final Value<String> id;
-  final Value<String> name;
-  final Value<String?> note;
-  final Value<DateTime?> performedAt;
-  final Value<DateTime> createdAt;
-  final Value<DateTime> updatedAt;
-  final Value<int> rowid;
-  const SetlistsCompanion({
-    this.id = const Value.absent(),
-    this.name = const Value.absent(),
-    this.note = const Value.absent(),
-    this.performedAt = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.updatedAt = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  SetlistsCompanion.insert({
-    required String id,
-    required String name,
-    this.note = const Value.absent(),
-    this.performedAt = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.updatedAt = const Value.absent(),
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       name = Value(name);
-  static Insertable<Setlist> custom({
-    Expression<String>? id,
-    Expression<String>? name,
-    Expression<String>? note,
-    Expression<DateTime>? performedAt,
-    Expression<DateTime>? createdAt,
-    Expression<DateTime>? updatedAt,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (name != null) 'name': name,
-      if (note != null) 'note': note,
-      if (performedAt != null) 'performed_at': performedAt,
-      if (createdAt != null) 'created_at': createdAt,
-      if (updatedAt != null) 'updated_at': updatedAt,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  SetlistsCompanion copyWith({
-    Value<String>? id,
-    Value<String>? name,
-    Value<String?>? note,
-    Value<DateTime?>? performedAt,
-    Value<DateTime>? createdAt,
-    Value<DateTime>? updatedAt,
-    Value<int>? rowid,
-  }) {
-    return SetlistsCompanion(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      note: note ?? this.note,
-      performedAt: performedAt ?? this.performedAt,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (note.present) {
-      map['note'] = Variable<String>(note.value);
-    }
-    if (performedAt.present) {
-      map['performed_at'] = Variable<DateTime>(performedAt.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<DateTime>(createdAt.value);
-    }
-    if (updatedAt.present) {
-      map['updated_at'] = Variable<DateTime>(updatedAt.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('SetlistsCompanion(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('note: $note, ')
-          ..write('performedAt: $performedAt, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6237,11 +6296,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $ScoresTable scores = $ScoresTable(this);
   late final $ScorePagesTable scorePages = $ScorePagesTable(this);
+  late final $SetlistsTable setlists = $SetlistsTable(this);
   late final $BookmarksTable bookmarks = $BookmarksTable(this);
   late final $JumpButtonsTable jumpButtons = $JumpButtonsTable(this);
   late final $TagsTable tags = $TagsTable(this);
   late final $ScoreTagsTable scoreTags = $ScoreTagsTable(this);
-  late final $SetlistsTable setlists = $SetlistsTable(this);
   late final $SetlistItemsTable setlistItems = $SetlistItemsTable(this);
   late final $InkStrokesTable inkStrokes = $InkStrokesTable(this);
   late final $AnnotationsTable annotations = $AnnotationsTable(this);
@@ -6254,11 +6313,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     scores,
     scorePages,
+    setlists,
     bookmarks,
     jumpButtons,
     tags,
     scoreTags,
-    setlists,
     setlistItems,
     inkStrokes,
     annotations,
@@ -6277,6 +6336,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'scores',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bookmarks', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'setlists',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('bookmarks', kind: UpdateKind.delete)],
@@ -7999,12 +8065,430 @@ typedef $$ScorePagesTableProcessedTableManager =
       ScorePage,
       PrefetchHooks Function({bool scoreId})
     >;
+typedef $$SetlistsTableCreateCompanionBuilder =
+    SetlistsCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> note,
+      Value<DateTime?> performedAt,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$SetlistsTableUpdateCompanionBuilder =
+    SetlistsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> note,
+      Value<DateTime?> performedAt,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$SetlistsTableReferences
+    extends BaseReferences<_$AppDatabase, $SetlistsTable, Setlist> {
+  $$SetlistsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$BookmarksTable, List<Bookmark>>
+  _bookmarksRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.bookmarks,
+    aliasName: 'setlists__id__bookmarks__setlist_id',
+  );
+
+  $$BookmarksTableProcessedTableManager get bookmarksRefs {
+    final manager = $$BookmarksTableTableManager(
+      $_db,
+      $_db.bookmarks,
+    ).filter((f) => f.setlistId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_bookmarksRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$SetlistItemsTable, List<SetlistItem>>
+  _setlistItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.setlistItems,
+    aliasName: 'setlists__id__setlist_items__setlist_id',
+  );
+
+  $$SetlistItemsTableProcessedTableManager get setlistItemsRefs {
+    final manager = $$SetlistItemsTableTableManager(
+      $_db,
+      $_db.setlistItems,
+    ).filter((f) => f.setlistId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_setlistItemsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$SetlistsTableFilterComposer
+    extends Composer<_$AppDatabase, $SetlistsTable> {
+  $$SetlistsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get performedAt => $composableBuilder(
+    column: $table.performedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> bookmarksRefs(
+    Expression<bool> Function($$BookmarksTableFilterComposer f) f,
+  ) {
+    final $$BookmarksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bookmarks,
+      getReferencedColumn: (t) => t.setlistId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookmarksTableFilterComposer(
+            $db: $db,
+            $table: $db.bookmarks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> setlistItemsRefs(
+    Expression<bool> Function($$SetlistItemsTableFilterComposer f) f,
+  ) {
+    final $$SetlistItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.setlistItems,
+      getReferencedColumn: (t) => t.setlistId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SetlistItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.setlistItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$SetlistsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SetlistsTable> {
+  $$SetlistsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get performedAt => $composableBuilder(
+    column: $table.performedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SetlistsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SetlistsTable> {
+  $$SetlistsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get performedAt => $composableBuilder(
+    column: $table.performedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> bookmarksRefs<T extends Object>(
+    Expression<T> Function($$BookmarksTableAnnotationComposer a) f,
+  ) {
+    final $$BookmarksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bookmarks,
+      getReferencedColumn: (t) => t.setlistId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookmarksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.bookmarks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> setlistItemsRefs<T extends Object>(
+    Expression<T> Function($$SetlistItemsTableAnnotationComposer a) f,
+  ) {
+    final $$SetlistItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.setlistItems,
+      getReferencedColumn: (t) => t.setlistId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SetlistItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.setlistItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$SetlistsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SetlistsTable,
+          Setlist,
+          $$SetlistsTableFilterComposer,
+          $$SetlistsTableOrderingComposer,
+          $$SetlistsTableAnnotationComposer,
+          $$SetlistsTableCreateCompanionBuilder,
+          $$SetlistsTableUpdateCompanionBuilder,
+          (Setlist, $$SetlistsTableReferences),
+          Setlist,
+          PrefetchHooks Function({bool bookmarksRefs, bool setlistItemsRefs})
+        > {
+  $$SetlistsTableTableManager(_$AppDatabase db, $SetlistsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SetlistsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SetlistsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SetlistsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<DateTime?> performedAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SetlistsCompanion(
+                id: id,
+                name: name,
+                note: note,
+                performedAt: performedAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> note = const Value.absent(),
+                Value<DateTime?> performedAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SetlistsCompanion.insert(
+                id: id,
+                name: name,
+                note: note,
+                performedAt: performedAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SetlistsTable, Setlist>(table),
+                  $$SetlistsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({bookmarksRefs = false, setlistItemsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (bookmarksRefs) db.bookmarks,
+                    if (setlistItemsRefs) db.setlistItems,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (bookmarksRefs)
+                        await $_getPrefetchedData<
+                          Setlist,
+                          $SetlistsTable,
+                          Bookmark
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SetlistsTableReferences
+                              ._bookmarksRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$SetlistsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).bookmarksRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.setlistId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (setlistItemsRefs)
+                        await $_getPrefetchedData<
+                          Setlist,
+                          $SetlistsTable,
+                          SetlistItem
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SetlistsTableReferences
+                              ._setlistItemsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$SetlistsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).setlistItemsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.setlistId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$SetlistsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SetlistsTable,
+      Setlist,
+      $$SetlistsTableFilterComposer,
+      $$SetlistsTableOrderingComposer,
+      $$SetlistsTableAnnotationComposer,
+      $$SetlistsTableCreateCompanionBuilder,
+      $$SetlistsTableUpdateCompanionBuilder,
+      (Setlist, $$SetlistsTableReferences),
+      Setlist,
+      PrefetchHooks Function({bool bookmarksRefs, bool setlistItemsRefs})
+    >;
 typedef $$BookmarksTableCreateCompanionBuilder =
     BookmarksCompanion Function({
       required String id,
       required String scoreId,
       required int page,
       required String label,
+      Value<String?> setlistId,
       Value<int> depth,
       Value<int> sortOrder,
       Value<int> rowid,
@@ -8015,6 +8499,7 @@ typedef $$BookmarksTableUpdateCompanionBuilder =
       Value<String> scoreId,
       Value<int> page,
       Value<String> label,
+      Value<String?> setlistId,
       Value<int> depth,
       Value<int> sortOrder,
       Value<int> rowid,
@@ -8035,6 +8520,23 @@ final class $$BookmarksTableReferences
       $_db.scores,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_scoreIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $SetlistsTable _setlistIdTable(_$AppDatabase db) =>
+      db.setlists.createAlias('bookmarks__setlist_id__setlists__id');
+
+  $$SetlistsTableProcessedTableManager? get setlistId {
+    final $_column = $_itemColumn<String>('setlist_id');
+    if ($_column == null) return null;
+    final manager = $$SetlistsTableTableManager(
+      $_db,
+      $_db.setlists,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_setlistIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -8090,6 +8592,29 @@ class $$BookmarksTableFilterComposer
           }) => $$ScoresTableFilterComposer(
             $db: $db,
             $table: $db.scores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$SetlistsTableFilterComposer get setlistId {
+    final $$SetlistsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.setlistId,
+      referencedTable: $db.setlists,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SetlistsTableFilterComposer(
+            $db: $db,
+            $table: $db.setlists,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -8156,6 +8681,29 @@ class $$BookmarksTableOrderingComposer
     );
     return composer;
   }
+
+  $$SetlistsTableOrderingComposer get setlistId {
+    final $$SetlistsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.setlistId,
+      referencedTable: $db.setlists,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SetlistsTableOrderingComposer(
+            $db: $db,
+            $table: $db.setlists,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$BookmarksTableAnnotationComposer
@@ -8204,6 +8752,29 @@ class $$BookmarksTableAnnotationComposer
     );
     return composer;
   }
+
+  $$SetlistsTableAnnotationComposer get setlistId {
+    final $$SetlistsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.setlistId,
+      referencedTable: $db.setlists,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SetlistsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.setlists,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$BookmarksTableTableManager
@@ -8219,7 +8790,7 @@ class $$BookmarksTableTableManager
           $$BookmarksTableUpdateCompanionBuilder,
           (Bookmark, $$BookmarksTableReferences),
           Bookmark,
-          PrefetchHooks Function({bool scoreId})
+          PrefetchHooks Function({bool scoreId, bool setlistId})
         > {
   $$BookmarksTableTableManager(_$AppDatabase db, $BookmarksTable table)
     : super(
@@ -8238,6 +8809,7 @@ class $$BookmarksTableTableManager
                 Value<String> scoreId = const Value.absent(),
                 Value<int> page = const Value.absent(),
                 Value<String> label = const Value.absent(),
+                Value<String?> setlistId = const Value.absent(),
                 Value<int> depth = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -8246,6 +8818,7 @@ class $$BookmarksTableTableManager
                 scoreId: scoreId,
                 page: page,
                 label: label,
+                setlistId: setlistId,
                 depth: depth,
                 sortOrder: sortOrder,
                 rowid: rowid,
@@ -8256,6 +8829,7 @@ class $$BookmarksTableTableManager
                 required String scoreId,
                 required int page,
                 required String label,
+                Value<String?> setlistId = const Value.absent(),
                 Value<int> depth = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -8264,6 +8838,7 @@ class $$BookmarksTableTableManager
                 scoreId: scoreId,
                 page: page,
                 label: label,
+                setlistId: setlistId,
                 depth: depth,
                 sortOrder: sortOrder,
                 rowid: rowid,
@@ -8276,7 +8851,7 @@ class $$BookmarksTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({scoreId = false}) {
+          prefetchHooksCallback: ({scoreId = false, setlistId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
@@ -8309,6 +8884,19 @@ class $$BookmarksTableTableManager
                               )
                               as T;
                     }
+                    if (setlistId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.setlistId,
+                                referencedTable: $$BookmarksTableReferences
+                                    ._setlistIdTable(db),
+                                referencedColumn: $$BookmarksTableReferences
+                                    ._setlistIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
 
                     return state;
                   },
@@ -8333,7 +8921,7 @@ typedef $$BookmarksTableProcessedTableManager =
       $$BookmarksTableUpdateCompanionBuilder,
       (Bookmark, $$BookmarksTableReferences),
       Bookmark,
-      PrefetchHooks Function({bool scoreId})
+      PrefetchHooks Function({bool scoreId, bool setlistId})
     >;
 typedef $$JumpButtonsTableCreateCompanionBuilder =
     JumpButtonsCompanion Function({
@@ -9326,327 +9914,6 @@ typedef $$ScoreTagsTableProcessedTableManager =
       (ScoreTag, $$ScoreTagsTableReferences),
       ScoreTag,
       PrefetchHooks Function({bool scoreId, bool tagId})
-    >;
-typedef $$SetlistsTableCreateCompanionBuilder =
-    SetlistsCompanion Function({
-      required String id,
-      required String name,
-      Value<String?> note,
-      Value<DateTime?> performedAt,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<int> rowid,
-    });
-typedef $$SetlistsTableUpdateCompanionBuilder =
-    SetlistsCompanion Function({
-      Value<String> id,
-      Value<String> name,
-      Value<String?> note,
-      Value<DateTime?> performedAt,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<int> rowid,
-    });
-
-final class $$SetlistsTableReferences
-    extends BaseReferences<_$AppDatabase, $SetlistsTable, Setlist> {
-  $$SetlistsTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static MultiTypedResultKey<$SetlistItemsTable, List<SetlistItem>>
-  _setlistItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.setlistItems,
-    aliasName: 'setlists__id__setlist_items__setlist_id',
-  );
-
-  $$SetlistItemsTableProcessedTableManager get setlistItemsRefs {
-    final manager = $$SetlistItemsTableTableManager(
-      $_db,
-      $_db.setlistItems,
-    ).filter((f) => f.setlistId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_setlistItemsRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
-
-class $$SetlistsTableFilterComposer
-    extends Composer<_$AppDatabase, $SetlistsTable> {
-  $$SetlistsTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get note => $composableBuilder(
-    column: $table.note,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get performedAt => $composableBuilder(
-    column: $table.performedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  Expression<bool> setlistItemsRefs(
-    Expression<bool> Function($$SetlistItemsTableFilterComposer f) f,
-  ) {
-    final $$SetlistItemsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.setlistItems,
-      getReferencedColumn: (t) => t.setlistId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SetlistItemsTableFilterComposer(
-            $db: $db,
-            $table: $db.setlistItems,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $$SetlistsTableOrderingComposer
-    extends Composer<_$AppDatabase, $SetlistsTable> {
-  $$SetlistsTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get note => $composableBuilder(
-    column: $table.note,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get performedAt => $composableBuilder(
-    column: $table.performedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $$SetlistsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $SetlistsTable> {
-  $$SetlistsTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<String> get note =>
-      $composableBuilder(column: $table.note, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get performedAt => $composableBuilder(
-    column: $table.performedAt,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<DateTime> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get updatedAt =>
-      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
-
-  Expression<T> setlistItemsRefs<T extends Object>(
-    Expression<T> Function($$SetlistItemsTableAnnotationComposer a) f,
-  ) {
-    final $$SetlistItemsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.setlistItems,
-      getReferencedColumn: (t) => t.setlistId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SetlistItemsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.setlistItems,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $$SetlistsTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $SetlistsTable,
-          Setlist,
-          $$SetlistsTableFilterComposer,
-          $$SetlistsTableOrderingComposer,
-          $$SetlistsTableAnnotationComposer,
-          $$SetlistsTableCreateCompanionBuilder,
-          $$SetlistsTableUpdateCompanionBuilder,
-          (Setlist, $$SetlistsTableReferences),
-          Setlist,
-          PrefetchHooks Function({bool setlistItemsRefs})
-        > {
-  $$SetlistsTableTableManager(_$AppDatabase db, $SetlistsTable table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$SetlistsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$SetlistsTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$SetlistsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<String?> note = const Value.absent(),
-                Value<DateTime?> performedAt = const Value.absent(),
-                Value<DateTime> createdAt = const Value.absent(),
-                Value<DateTime> updatedAt = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => SetlistsCompanion(
-                id: id,
-                name: name,
-                note: note,
-                performedAt: performedAt,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String name,
-                Value<String?> note = const Value.absent(),
-                Value<DateTime?> performedAt = const Value.absent(),
-                Value<DateTime> createdAt = const Value.absent(),
-                Value<DateTime> updatedAt = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => SetlistsCompanion.insert(
-                id: id,
-                name: name,
-                note: note,
-                performedAt: performedAt,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable<$SetlistsTable, Setlist>(table),
-                  $$SetlistsTableReferences(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback: ({setlistItemsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (setlistItemsRefs) db.setlistItems],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (setlistItemsRefs)
-                    await $_getPrefetchedData<
-                      Setlist,
-                      $SetlistsTable,
-                      SetlistItem
-                    >(
-                      currentTable: table,
-                      referencedTable: $$SetlistsTableReferences
-                          ._setlistItemsRefsTable(db),
-                      managerFromTypedResult: (p0) => $$SetlistsTableReferences(
-                        db,
-                        table,
-                        p0,
-                      ).setlistItemsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.setlistId == item.id),
-                      typedResults: items,
-                    ),
-                ];
-              },
-            );
-          },
-        ),
-      );
-}
-
-typedef $$SetlistsTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $SetlistsTable,
-      Setlist,
-      $$SetlistsTableFilterComposer,
-      $$SetlistsTableOrderingComposer,
-      $$SetlistsTableAnnotationComposer,
-      $$SetlistsTableCreateCompanionBuilder,
-      $$SetlistsTableUpdateCompanionBuilder,
-      (Setlist, $$SetlistsTableReferences),
-      Setlist,
-      PrefetchHooks Function({bool setlistItemsRefs})
     >;
 typedef $$SetlistItemsTableCreateCompanionBuilder =
     SetlistItemsCompanion Function({
@@ -11355,6 +11622,8 @@ class $AppDatabaseManager {
       $$ScoresTableTableManager(_db, _db.scores);
   $$ScorePagesTableTableManager get scorePages =>
       $$ScorePagesTableTableManager(_db, _db.scorePages);
+  $$SetlistsTableTableManager get setlists =>
+      $$SetlistsTableTableManager(_db, _db.setlists);
   $$BookmarksTableTableManager get bookmarks =>
       $$BookmarksTableTableManager(_db, _db.bookmarks);
   $$JumpButtonsTableTableManager get jumpButtons =>
@@ -11362,8 +11631,6 @@ class $AppDatabaseManager {
   $$TagsTableTableManager get tags => $$TagsTableTableManager(_db, _db.tags);
   $$ScoreTagsTableTableManager get scoreTags =>
       $$ScoreTagsTableTableManager(_db, _db.scoreTags);
-  $$SetlistsTableTableManager get setlists =>
-      $$SetlistsTableTableManager(_db, _db.setlists);
   $$SetlistItemsTableTableManager get setlistItems =>
       $$SetlistItemsTableTableManager(_db, _db.setlistItems);
   $$InkStrokesTableTableManager get inkStrokes =>
