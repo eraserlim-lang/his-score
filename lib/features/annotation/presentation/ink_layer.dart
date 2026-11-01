@@ -90,6 +90,10 @@ class _InkLayerState extends State<InkLayer> {
     if (erasing) {
       _erasedOriginal.clear();
       _erasedResult = [];
+      // 지난번에 잘린 조각은 이제 그 자체로 확정된 획이다. 옛 원본을 가리키는
+      // 기록이 남아 있으면 그 조각을 지울 때 이미 없는 원본을 찾다가 놓쳐,
+      // 한 번 잘린 선은 다시는 지워지지 않았다.
+      _pieceOrigin.clear();
       _eraserCursor = e.localPosition;
       _eraseAt(n, t);
       setState(() {});
@@ -389,6 +393,19 @@ class _InkLayerState extends State<InkLayer> {
           builder: (context, constraints) {
             final size = Size(constraints.maxWidth, constraints.maxHeight);
             var ink = widget.controller.ink;
+            // 지우개가 지나가는 동안 잘라낸 결과를 바로 보여 준다. 확정(되돌리기
+            // 기록)은 손을 뗄 때 한 번에 한다. 전에는 확정된 획만 그려서 손을
+            // 떼야 지워진 것이 보였다.
+            if (_eraserCursor != null &&
+                (_erasedOriginal.isNotEmpty || _erasedResult.isNotEmpty)) {
+              ink = ink.copyWith(
+                strokes: [
+                  for (final s in ink.strokes)
+                    if (!_erasedOriginal.containsKey(s.id)) s,
+                  ..._erasedResult,
+                ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
+              );
+            }
             if (_previewPlaced != null) {
               ink = ink.copyWith(
                 placed: [
